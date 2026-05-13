@@ -1,8 +1,10 @@
 """Tests for admin panel."""
 
+import os
+from unittest.mock import patch, MagicMock
+
 import pytest
 from fastapi.testclient import TestClient
-from unittest.mock import patch, MagicMock
 
 from memory_mcp.admin.auth import AdminAuth
 
@@ -65,6 +67,28 @@ class TestAdminAuth:
         count = auth.revoke_all_sessions()
         assert count == 2
         assert len(auth.get_active_sessions()) == 0
+
+    def test_change_password_persists_across_instances(self, tmp_path, monkeypatch):
+        """Changed admin password should persist and be loaded by a new instance."""
+        config_path = tmp_path / "admin_auth.json"
+        monkeypatch.setenv("ADMIN_AUTH_CONFIG_PATH", str(config_path))
+        monkeypatch.delenv("ADMIN_PASSWORD_HASH", raising=False)
+        monkeypatch.delenv("ADMIN_PASSWORD_SALT", raising=False)
+
+        auth = AdminAuth()
+        assert auth.change_password("admin123", "new-secret-456") is True
+
+        reloaded = AdminAuth()
+        assert reloaded.verify_password("admin123") is False
+        assert reloaded.verify_password("new-secret-456") is True
+        assert config_path.exists() is True
+
+    def test_default_persisted_config_path_is_project_relative(self):
+        """Default persisted auth config path should live under the project data dir."""
+        auth = AdminAuth()
+
+        assert auth._config_path.is_absolute() is True
+        assert auth._config_path.as_posix().endswith("/agent-memory/data/admin_auth.json")
 
 
 class TestAdminRoutes:

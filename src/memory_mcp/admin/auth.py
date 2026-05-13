@@ -1,16 +1,25 @@
 """Admin authentication module."""
 
+from __future__ import annotations
+
 import hashlib
-import secrets
+import json
 import os
-from typing import Optional
+import secrets
 from datetime import datetime, timedelta
+from pathlib import Path
+from typing import Optional
 
 
 def get_config() -> dict:
-    """Get admin configuration."""
+    """Get admin configuration from environment variables."""
+    project_root = Path(__file__).resolve().parents[3]
+    default_config_path = project_root / "data" / "admin_auth.json"
+    configured_path = os.environ.get("ADMIN_AUTH_CONFIG_PATH")
+
     return {
         "admin": {
+            "config_path": configured_path or str(default_config_path),
             "password_hash": os.environ.get("ADMIN_PASSWORD_HASH"),
             "password_salt": os.environ.get("ADMIN_PASSWORD_SALT", ""),
         }
@@ -19,111 +28,118 @@ def get_config() -> dict:
 
 class AdminAuth:
     """Admin authentication handler."""
-    
-    # Default admin password (should be changed after first login)
+
     DEFAULT_PASSWORD = "admin123"
-    
-    # Session duration in hours
     SESSION_DURATION_HOURS = 24
-    
+
     def __init__(self):
         self._sessions: dict[str, dict] = {}
         self._password_hash: Optional[str] = None
+        self._password_salt: str = ""
+        self._config_path = Path(get_config()["admin"]["config_path"])
         self._load_password()
-    
-    def _load_password(self):
-        """Load admin password hash from config."""
-        config = get_config()
-        admin_config = config.get("admin", {})
-        self._password_hash = admin_config.get("password_hash")
-    
-    def _hash_password(self, password: str, salt: str = None) -> tuple[str, str]:
+
+    def _load_password(self) -> None:
+        """Load admin password hash from config file or environment."""
+        config = get_config()["admin"]
+
+        if self._config_path.exists():
+            try:
+                data = json.loads(self._config_path.read_text(encoding="utf-8"))
+                self._password_hash = data.get("password_hash")
+                self._password_salt = data.get("password_salt", "")
+                return
+            except (json.JSONDecodeError, OSError, TypeError):
+                # Fall back to env/default behavior when persisted config is invalid.
+                pass
+
+        self._password_hash = config.get("password_hash")
+        self._password_salt = config.get("password_salt", "")
+
+    def _save_password(self) -> None:
+        """Persist admin password hash to local config file."""
+        self._config_path.parent.mkdir(parents=True, exist_ok=True)
+        payload = {
+            "password_hash": self._password_hash,
+            "password_salt": self._password_salt,
+            "updated_at": datetime.now().isoformat(),
+        }
+        self._config_path.write_text(
+            json.dumps(payload, ensure_ascii=False, indent=2),
+            encoding="utf-8",
+        )
+
+    def _hash_password(self, password: str, salt: Optional[str] = None) -> tuple[str, str]:
         """Hash password with salt."""
         if salt is None:
             salt = secrets.token_hex(16)
         hash_obj = hashlib.sha256(f"{salt}{password}".encode())
         password_hash = hash_obj.hexdigest()
         return password_hash, salt
-    
+
     def verify_password(self, password: str) -> bool:
         """Verify admin password."""
-        # If no custom password set, use default
         if self._password_hash is None:
             return password == self.DEFAULT_PASSWORD
-        
-        # Load salt from config
-        config = get_config()
-        admin_config = config.get("admin", {})
-        salt = admin_config.get("password_salt", "")
-        
-        # Hash and compare
-        password_hash, _ = self._hash_password(password, salt)
+
+        password_hash, _ = self._hash_password(password, self._password_salt)
         return password_hash == self._password_hash
-    
+
     def change_password(self, old_password: str, new_password: str) -> bool:
-        """Change admin password."""
+        """Change admin password and persist it."""
         if not self.verify_password(old_password):
             return False
-        
-        # Hash new password
-        salt = secrets.token_hex(16)
-        password_hash, _ = self._hash_password(new_password, salt)
-        
-        # Update config (in memory, should be persisted to config file)
+
+        password_hash, salt = self._hash_password(new_password)
         self._password_hash = password_hash
+        self._password_salt = salt
+        self._save_password()
         return True
-    
+
     def create_session(self, password: str) -> Optional[str]:
         """Create a new admin session."""
         if not self.verify_password(password):
             return None
-        
-        # Generate session token
+
         token = secrets.token_urlsafe(32)
-        
-        # Store session
         self._sessions[token] = {
             "created_at": datetime.now(),
             "expires_at": datetime.now() + timedelta(hours=self.SESSION_DURATION_HOURS),
         }
-        
         return token
-    
+
     def verify_session(self, token: str) -> bool:
         """Verify session token."""
         if token not in self._sessions:
             return False
-        
+
         session = self._sessions[token]
-        
-        # Check if session expired
         if datetime.now() > session["expires_at"]:
             del self._sessions[token]
             return False
-        
+
         return True
-    
+
     def revoke_session(self, token: str) -> bool:
         """Revoke a session."""
         if token in self._sessions:
             del self._sessions[token]
             return True
         return False
-    
+
     def revoke_all_sessions(self) -> int:
         """Revoke all sessions."""
         count = len(self._sessions)
         self._sessions.clear()
         return count
-    
+
     def get_active_sessions(self) -> list[dict]:
         """Get all active sessions."""
-        # Clean expired sessions
         now = datetime.now()
         expired = [t for t, s in self._sessions.items() if now > s["expires_at"]]
         for token in expired:
             del self._sessions[token]
-        
+
         return [
             {
                 "token_preview": token[:8] + "...",

@@ -32,5 +32,33 @@ export default defineConfig({
   build: {
     outDir: '../src/memory_mcp/admin/static',
     emptyOutDir: true,
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          if (!id.includes('node_modules')) {
+            return undefined
+          }
+
+          if (id.includes('element-plus') || id.includes('@element-plus')) {
+            return 'element-plus'
+          }
+
+          if (id.includes('echarts') || id.includes('zrender') || id.includes('vue-echarts')) {
+            return 'charts'
+          }
+
+          if (
+            id.includes('vue-router') ||
+            id.includes('pinia') ||
+            id.includes('/vue/') ||
+            id.includes('node_modules/vue/')
+          ) {
+            return 'vue-vendor'
+          }
+
+          return 'vendor'
+        },
+      },
+    },
   },
 })

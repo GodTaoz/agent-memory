@@ -2,7 +2,7 @@
 import { ref, onMounted } from 'vue'
 import axios from 'axios'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Search, Edit, Delete, Download } from '@element-plus/icons-vue'
+import { Search, Edit, Delete, Download, ArrowDown } from '@element-plus/icons-vue'
 
 interface Memory {
   key: string
@@ -157,7 +157,7 @@ onMounted(() => {
       <div class="header-actions">
         <el-dropdown @command="exportJson">
           <el-button :icon="Download">
-            导出 <el-icon class="el-icon--right"><arrow-down /></el-icon>
+            导出 <el-icon class="el-icon--right"><ArrowDown /></el-icon>
           </el-button>
           <template #dropdown>
             <el-dropdown-menu>
