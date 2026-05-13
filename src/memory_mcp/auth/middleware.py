@@ -19,26 +19,25 @@ class AuthMiddleware:
             config: Authentication configuration with api_keys list
         """
         self._api_keys: List[str] = config.get("api_keys", [])
+        self._api_key_store = config.get("api_key_store")
 
     def validate_api_key(self, api_key: Optional[str]) -> bool:
-        """Validate an API key.
-        
-        Args:
-            api_key: API key to validate
-            
-        Returns:
-            True if valid or no keys configured
-        """
-        # If no API keys configured, allow all
+        """Validate an API key."""
+        if self._api_key_store is not None:
+            if not self._api_key_store.is_enforced():
+                return True
+            return self._api_key_store.validate_key(api_key)
+
         if not self._api_keys:
             return True
-        
-        # Check if API key is provided
         if not api_key:
             return False
-        
-        # Check if API key is valid
         return api_key in self._api_keys
+
+    def record_usage(self, api_key: Optional[str]) -> None:
+        """Record successful usage for a managed API key."""
+        if self._api_key_store is not None:
+            self._api_key_store.record_usage(api_key)
 
     def extract_api_key(
         self,

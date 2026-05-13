@@ -12,11 +12,14 @@ interface ApiKey {
   created_at: string
   last_used: string | null
   usage_count: number
+  full_key?: string | null
 }
 
 const apiKeys = ref<ApiKey[]>([])
 const loading = ref(true)
 const showCreateDialog = ref(false)
+const showCreatedKeyDialog = ref(false)
+const createdKey = ref<ApiKey | null>(null)
 
 const newKey = ref({
   name: '',
@@ -37,11 +40,16 @@ async function fetchApiKeys() {
 
 async function createApiKey() {
   try {
-    await axios.post('/admin/api/api-keys', newKey.value)
+    const response = await axios.post('/admin/api/api-keys', newKey.value)
+    createdKey.value = {
+      ...response.data,
+      full_key: response.data.full_key,
+    }
+    showCreatedKeyDialog.value = true
     ElMessage.success('API Key创建成功')
     showCreateDialog.value = false
     newKey.value = { name: '', permissions: 'read', description: '' }
-    fetchApiKeys()
+    await fetchApiKeys()
   } catch (error) {
     ElMessage.error('创建失败')
   }
@@ -135,7 +143,6 @@ onMounted(() => {
       </div>
     </el-card>
     
-    <!-- Create Dialog -->
     <el-dialog v-model="showCreateDialog" title="创建 API Key" width="500px">
       <el-form :model="newKey" label-width="80px">
         <el-form-item label="名称" required>
@@ -158,6 +165,26 @@ onMounted(() => {
       <template #footer>
         <el-button @click="showCreateDialog = false">取消</el-button>
         <el-button type="primary" @click="createApiKey">创建</el-button>
+      </template>
+    </el-dialog>
+
+    <el-dialog v-model="showCreatedKeyDialog" title="API Key 创建成功" width="560px">
+      <p class="created-key-tip">完整 Key 只会展示这一次，请立即复制并安全保存。</p>
+      <el-input
+        :model-value="createdKey?.full_key || ''"
+        readonly
+      >
+        <template #append>
+          <el-button
+            :icon="DocumentCopy"
+            @click="createdKey?.full_key && copyKey(createdKey.full_key)"
+          >
+            复制
+          </el-button>
+        </template>
+      </el-input>
+      <template #footer>
+        <el-button @click="showCreatedKeyDialog = false">关闭</el-button>
       </template>
     </el-dialog>
   </div>
@@ -186,5 +213,10 @@ onMounted(() => {
 
 .empty-state {
   padding: 40px 0;
+}
+
+.created-key-tip {
+  margin-bottom: 12px;
+  color: var(--el-text-color-secondary);
 }
 </style>

@@ -12,11 +12,22 @@ from memory_mcp.admin.auth import AdminAuth
 class TestAdminAuth:
     """Test admin authentication."""
     
-    def test_default_password(self):
+    def test_default_password_verification(self):
         """Test default password verification."""
         auth = AdminAuth()
         assert auth.verify_password("admin123") is True
         assert auth.verify_password("wrong") is False
+
+    def test_detects_default_password_state(self, tmp_path, monkeypatch):
+        """Fresh instances should report that the default password is still active."""
+        monkeypatch.setenv("ADMIN_AUTH_CONFIG_PATH", str(tmp_path / "admin_auth.json"))
+        monkeypatch.delenv("ADMIN_PASSWORD_HASH", raising=False)
+        monkeypatch.delenv("ADMIN_PASSWORD_SALT", raising=False)
+
+        auth = AdminAuth()
+
+        assert auth.is_default_password() is True
+        assert auth.requires_password_change() is True
     
     def test_create_session(self):
         """Test session creation."""
@@ -77,11 +88,39 @@ class TestAdminAuth:
 
         auth = AdminAuth()
         assert auth.change_password("admin123", "new-secret-456") is True
+        assert auth.is_default_password() is False
+        assert auth.requires_password_change() is False
 
         reloaded = AdminAuth()
         assert reloaded.verify_password("admin123") is False
         assert reloaded.verify_password("new-secret-456") is True
+        assert reloaded.is_default_password() is False
         assert config_path.exists() is True
+
+    def test_password_file_permissions_are_restricted(self, tmp_path, monkeypatch):
+        """Persisted password file should be owner-read/write only."""
+        config_path = tmp_path / "admin_auth.json"
+        monkeypatch.setenv("ADMIN_AUTH_CONFIG_PATH", str(config_path))
+        monkeypatch.delenv("ADMIN_PASSWORD_HASH", raising=False)
+        monkeypatch.delenv("ADMIN_PASSWORD_SALT", raising=False)
+
+        auth = AdminAuth()
+        assert auth.change_password("admin123", "new-secret-456") is True
+
+        assert oct(config_path.stat().st_mode & 0o777) == "0o600"
+
+    def test_failed_login_attempts_trigger_lockout(self, tmp_path, monkeypatch):
+        """Repeated login failures should temporarily lock the admin account."""
+        monkeypatch.setenv("ADMIN_AUTH_CONFIG_PATH", str(tmp_path / "admin_auth.json"))
+        monkeypatch.delenv("ADMIN_PASSWORD_HASH", raising=False)
+        monkeypatch.delenv("ADMIN_PASSWORD_SALT", raising=False)
+
+        auth = AdminAuth()
+        for _ in range(auth.MAX_FAILED_ATTEMPTS):
+            assert auth.create_session("wrong-password") is None
+
+        assert auth.is_locked_out() is True
+        assert auth.create_session("admin123") is None
 
     def test_default_persisted_config_path_is_project_relative(self):
         """Default persisted auth config path should live under the project data dir."""
@@ -109,6 +148,13 @@ class TestAdminRoutes:
         
         app = FastAPI()
         app.include_router(router)
+        app.state.memory_engine = MagicMock()
+        app.state.memory_engine.count.return_value = 0
+        app.state.memory_engine.list_memories.return_value = []
+        app.state.memory_engine.search.return_value = []
+        app.state.memory_engine.get.return_value = None
+        app.state.memory_engine.update.return_value = None
+        app.state.memory_engine.delete.return_value = False
         
         # Override the dependency to use the same instance
         app.dependency_overrides[get_admin_auth] = lambda: admin_auth
@@ -135,6 +181,13 @@ class TestAdminRoutes:
         response = client.post("/admin/api/auth/login", json={"password": "wrong"})
         
         assert response.status_code == 401
+
+    def test_login_rate_limit_after_repeated_failures(self, client):
+        """Repeated failed login attempts should return 429 once locked."""
+        for _ in range(5):
+            response = client.post("/admin/api/auth/login", json={"password": "wrong"})
+
+        assert response.status_code == 429
     
     def test_get_stats(self, client, auth_headers):
         """Test getting system stats."""
@@ -156,7 +209,9 @@ class TestAdminRoutes:
         response = client.get("/admin/api/memories", headers=auth_headers)
         
         assert response.status_code == 200
-        assert isinstance(response.json(), list)
+        payload = response.json()
+        assert isinstance(payload["memories"], list)
+        assert isinstance(payload["total"], int)
     
     def test_get_agents(self, client, auth_headers):
         """Test getting agents."""

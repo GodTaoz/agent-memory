@@ -162,6 +162,7 @@ class TestAuthIntegration:
         """Test request without auth when not configured."""
         mock_engine = MagicMock()
         mock_engine.count.return_value = 0
+        mock_engine.list_memories.return_value = []
         
         # No auth config
         app = create_app(mock_engine)
@@ -170,3 +171,21 @@ class TestAuthIntegration:
         # Request without API key should succeed when auth not configured
         response = client.get("/api/v1/health")
         assert response.status_code == 200
+
+        response = client.get("/api/v1/memories")
+        assert response.status_code == 200
+
+    def test_root_and_frontend_routes_stay_public_even_when_api_keys_required(self):
+        """Admin frontend routes should not be blocked by REST API key middleware."""
+        mock_engine = MagicMock()
+        mock_engine.count.return_value = 0
+        auth_config = {"api_keys": ["test-key-123"]}
+
+        app = create_app(mock_engine, auth_config=auth_config)
+        client = TestClient(app)
+
+        root_response = client.get("/")
+        assert root_response.status_code == 200
+
+        frontend_route_response = client.get("/memories")
+        assert frontend_route_response.status_code == 200

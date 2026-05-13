@@ -31,15 +31,19 @@ It is designed to be:
 - Single-port deployment on **`5678`**
 - Vue 3 + Element Plus frontend
 - Light / dark / system theme switching
-- Dashboard for service overview
-- API key management view
+- Dashboard with live Redis / memory / API key / request stats
+- API key management: list / create / delete / usage tracking
 - Memory browse / search / edit / delete / export
-- Agent activity overview
-- SQLite-backed admin and access logs
-- Admin password login, with in-panel password change
+- Agent activity overview (placeholder UI, backend extension point)
+- SQLite-backed admin + REST access statistics
+- Admin password login, in-panel password change, failed-login lockout, and default-password warning signal
 
 ### Security
 - REST API key authentication
+- Managed API key permissions:
+  - `read` → read-only REST access
+  - `read_write` → full memory CRUD over REST
+  - `admin` → reserved / bootstrap-compatible full access
 - Supported auth methods:
   - `Authorization: Bearer <api_key>`
   - `X-API-Key: <api_key>`
@@ -131,17 +135,23 @@ The admin panel is served from the same port as the API.
 
 ### Current panel scope
 
-- Dashboard / service stats
-- API key management
+- Dashboard / service stats (live Redis + request metrics)
+- API key management (create / list / revoke)
 - Memory inspection and editing
-- Agent overview
-- Operation / login / API access logs
+- Agent overview shell (backend can be extended further)
+- Operation logs API and REST access metrics
 - Export entry points
 - Theme switching: light / dark / follow system
 
 Admin logs are stored in SQLite by default:
 
 - default file: `data/admin_logs.db`
+- configurable via `ADMIN_LOG_DB_PATH`
+
+Admin auth / API key persistence defaults:
+
+- admin password state: `data/admin_auth.json`
+- managed API keys: `data/api_keys.json`
 
 ---
 
@@ -220,10 +230,12 @@ async with stdio_client(server_params) as (read, write):
 | `REDIS_PORT` | `6379` | Redis port |
 | `REDIS_PASSWORD` | empty | Redis password |
 | `REDIS_DB` | `0` | Redis database index |
-| `API_KEYS` | empty | Comma-separated REST API keys |
+| `API_KEYS` | empty | Bootstrap REST API keys (optional compatibility path) |
 | `ADMIN_PASSWORD_HASH` | empty | Optional hashed admin password |
 | `ADMIN_PASSWORD_SALT` | empty | Salt for the hashed admin password |
-| `ADMIN_LOG_DB_PATH` | `data/admin_logs.db` | SQLite path for admin logs |
+| `ADMIN_AUTH_CONFIG_PATH` | `data/admin_auth.json` | Persisted admin password state |
+| `ADMIN_API_KEYS_PATH` | `data/api_keys.json` | Persisted managed API keys |
+| `ADMIN_LOG_DB_PATH` | `data/admin_logs.db` | SQLite path for admin logs and REST access stats |
 | `LOG_LEVEL` | `INFO` | Log level |
 
 ### Config files
@@ -303,7 +315,18 @@ agent-memory/
 
 ## Security notes
 
-Current baseline security includes REST API key auth and admin login, but for production you should still add:
+Current baseline security includes REST API key auth and admin login, and the admin flow now also includes:
+
+- default-password detection (`requires_password_change` on login)
+- persisted admin password state
+- managed API key persistence + revocation
+- enforced API key permissions (`read` vs `read_write`)
+- login / admin mutation / REST access audit logs in SQLite
+- failed-login lockout after repeated attempts
+- password state file permissions tightened to owner-only (`0600`)
+- API key store file permissions tightened to owner-only (`0600`)
+
+For production you should still add:
 
 - HTTPS / TLS
 - reverse proxy (Nginx / Caddy) if exposed publicly

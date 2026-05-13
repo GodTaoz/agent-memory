@@ -4,6 +4,8 @@ This module implements the REST API endpoints for memory operations.
 """
 
 import logging
+import time
+from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
@@ -15,6 +17,8 @@ from pydantic import BaseModel, Field
 from memory_mcp.engine.memory import MemoryEngine
 from memory_mcp.models import Memory
 from memory_mcp.auth.middleware import AuthMiddleware
+from memory_mcp.admin.api_keys import ApiKeyStore
+from memory_mcp.admin.logger import get_logger
 from memory_mcp.admin.routes import router as admin_router
 
 logger = logging.getLogger(__name__)
@@ -78,11 +82,17 @@ def create_app(engine: MemoryEngine, auth_config: Optional[Dict[str, Any]] = Non
         version="0.1.0"
     )
     
+    auth_config = auth_config or {}
+    app.state.memory_engine = engine
+    app.state.api_key_store = ApiKeyStore(bootstrap_keys=auth_config.get("api_keys", []))
+    app.state.admin_logger = get_logger()
+    app.state.started_at = datetime.now()
+
     # Include admin routes
     app.include_router(admin_router)
     
     # Initialize auth middleware
-    auth_middleware = AuthMiddleware(auth_config or {})
+    auth_middleware = AuthMiddleware({**auth_config, "api_key_store": app.state.api_key_store})
     
     # Paths that don't require API key authentication
     PUBLIC_PATHS = [
@@ -95,6 +105,9 @@ def create_app(engine: MemoryEngine, auth_config: Optional[Dict[str, Any]] = Non
     async def auth_middleware_handler(request: Request, call_next):
         """Authentication middleware."""
         path = request.url.path
+
+        if not path.startswith("/api/v1"):
+            return await call_next(request)
         
         # Skip auth for public paths and admin panel
         if any(path.startswith(p) for p in PUBLIC_PATHS):
@@ -116,8 +129,31 @@ def create_app(engine: MemoryEngine, auth_config: Optional[Dict[str, Any]] = Non
                 status_code=401,
                 content={"error": "Invalid or missing API key"}
             )
-        
-        return await call_next(request)
+
+        key_permissions = app.state.api_key_store.get_permissions(api_key)
+        if (
+            app.state.api_key_store.is_enforced()
+            and request.method in {"POST", "PUT", "PATCH", "DELETE"}
+            and key_permissions not in {"read_write", "admin"}
+        ):
+            return JSONResponse(
+                status_code=403,
+                content={"error": "API key does not have write permissions"}
+            )
+
+        started = time.perf_counter()
+        response = await call_next(request)
+        response_time_ms = round((time.perf_counter() - started) * 1000, 2)
+        auth_middleware.record_usage(api_key)
+        app.state.admin_logger.log_api_access(
+            method=request.method,
+            path=path,
+            status_code=response.status_code,
+            response_time_ms=response_time_ms,
+            api_key_preview=app.state.api_key_store.get_key_preview(api_key),
+            ip_address=request.client.host if request.client else None,
+        )
+        return response
     
     @app.get("/api/v1/health")
     async def health():

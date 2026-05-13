@@ -45,8 +45,8 @@ async function fetchMemories() {
     }
     
     const response = await axios.get('/admin/api/memories', { params })
-    memories.value = response.data
-    total.value = response.data.length // TODO: Get total from API
+    memories.value = response.data.memories
+    total.value = response.data.total
   } catch (error) {
     ElMessage.error('获取记忆列表失败')
   } finally {
