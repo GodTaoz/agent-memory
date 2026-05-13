@@ -87,13 +87,9 @@ git clone https://github.com/GodTaoz/agent-memory.git
 cd agent-memory
 
 cp config/config.example.yaml config/config.yaml
-cp config/permissions.example.yaml config/permissions.yaml
 
-# optional: export runtime secrets
+# optional: export runtime secrets consumed by docker-compose.yml
 export REDIS_PASSWORD='your-redis-password'
-export API_KEYS='agent-key-1,agent-key-2'
-export ADMIN_PASSWORD_HASH=''
-export ADMIN_PASSWORD_SALT=''
 
 docker-compose up -d
 ```
@@ -109,11 +105,19 @@ Then open:
 git clone https://github.com/GodTaoz/agent-memory.git
 cd agent-memory
 
-python3 -m venv venv
-source venv/bin/activate
-pip install -e ".[all]"
+python3 -m venv .venv
+source .venv/bin/activate
+python -m pip install --upgrade pip
+pip install -e '.[all]'
 
-# start backend
+cp config/config.example.yaml config/config.yaml
+
+# run the test suite
+pytest -q
+
+# start backend (requires a reachable Redis instance)
+# if your Redis requires auth, export REDIS_PASSWORD first
+# example: export REDIS_HOST=192.168.10.10 REDIS_PASSWORD='your-redis-password'
 uvicorn memory_mcp.main:create_app --factory --host 0.0.0.0 --port 5678
 ```
 
@@ -122,6 +126,13 @@ If you want to run via console script after installation:
 ```bash
 memory-mcp
 ```
+
+`memory-mcp` reads bind settings from `config/config.yaml` plus environment overrides such as `SERVER_HOST` and `SERVER_PORT`. The explicit `uvicorn ... --host ... --port ...` example above overrides the bind address at launch time.
+
+Additional developer docs:
+
+- `docs/development.md` - environment setup, verification commands, and troubleshooting
+- `docs/architecture.md` - high-level system layout and component responsibilities
 
 ---
 
@@ -145,7 +156,7 @@ The admin panel is served from the same port as the API.
 
 Admin logs are stored in SQLite by default:
 
-- default file: `data/admin_logs.db`
+- default file: `data/admin_logs.db` relative to the current working directory
 - configurable via `ADMIN_LOG_DB_PATH`
 
 Admin auth / API key persistence defaults:
@@ -196,24 +207,17 @@ curl http://localhost:5678/api/v1/health
 
 ## MCP integration
 
-Example stdio client usage:
+The repository includes MCP tool definitions in `src/memory_mcp/protocol/mcp.py`, but the verified local runtime in this milestone is the FastAPI REST/admin service started through `memory_mcp.main:create_app` or `memory-mcp`.
+
+Treat the MCP layer as an implementation surface that still needs a dedicated transport/bootstrap entrypoint before it can be launched as a standalone stdio server.
+
+Current MCP tool surface:
 
 ```python
-from mcp import ClientSession, StdioServerParameters
-from mcp.client.stdio import stdio_client
+from memory_mcp.protocol.mcp import MCPServer
 
-server_params = StdioServerParameters(
-    command="python",
-    args=["-m", "memory_mcp.protocol.mcp"],
-)
-
-async with stdio_client(server_params) as (read, write):
-    async with ClientSession(read, write) as session:
-        await session.initialize()
-        await session.call_tool("memory.save", {
-            "content": "User prefers concise and elegant code.",
-            "tags": ["preference", "coding"],
-        })
+server = MCPServer(engine)
+tools = server.get_tools()
 ```
 
 ---
@@ -241,12 +245,12 @@ async with stdio_client(server_params) as (read, write):
 ### Config files
 
 - `config/config.yaml` - server / Redis / search / logging config
-- `config/permissions.yaml` - agent permissions / ACL-related config
+- `config/permissions.yaml` - example ACL-related config for future isolation work; the current FastAPI startup path does not load it yet
 
 You can start from:
 
 - `config/config.example.yaml`
-- `config/permissions.example.yaml`
+- `config/permissions.example.yaml` (optional reference for planned ACL work)
 
 ---
 
