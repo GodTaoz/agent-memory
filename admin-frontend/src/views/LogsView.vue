@@ -2,7 +2,7 @@
 import { ref, onMounted } from 'vue'
 import axios from 'axios'
 import { ElMessage } from 'element-plus'
-import { Refresh, Warning, Info, SuccessFilled } from '@element-plus/icons-vue'
+import { Refresh, Warning, SuccessFilled } from '@element-plus/icons-vue'
 
 interface LogEntry {
   timestamp: string
@@ -41,12 +41,10 @@ function getLevelIcon(level: string) {
       return Warning
     case 'warning':
       return Warning
-    case 'info':
-      return Info
     case 'success':
       return SuccessFilled
     default:
-      return Info
+      return undefined
   }
 }
 

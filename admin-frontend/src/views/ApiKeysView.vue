@@ -2,7 +2,7 @@
 import { ref, onMounted } from 'vue'
 import axios from 'axios'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Plus, Delete, Copy } from '@element-plus/icons-vue'
+import { Plus, Delete, DocumentCopy } from '@element-plus/icons-vue'
 
 interface ApiKey {
   key_preview: string
@@ -123,7 +123,7 @@ onMounted(() => {
         <el-table-column label="操作" width="150" align="center">
           <template #default="{ row }">
             <el-button-group>
-              <el-button :icon="Copy" @click="copyKey(row.key_preview)" />
+              <el-button :icon="DocumentCopy" @click="copyKey(row.key_preview)" />
               <el-button :icon="Delete" type="danger" @click="deleteApiKey(row)" />
             </el-button-group>
           </template>
