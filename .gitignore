@@ -1,39 +1,53 @@
-# Python
+# Python caches and virtualenvs
 __pycache__/
 *.py[cod]
 *$py.class
 *.so
 .Python
+.venv/
 venv/
 env/
+
+# Packaging
 *.egg-info/
 dist/
 build/
 *.egg
+pip-wheel-metadata/
 
-# Node
+# Test and type-check caches
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+.mypy_cache/
+.ruff_cache/
+.pyre/
+.hypothesis/
+
+# Runtime data and logs
+data/
+*.log
+*.sqlite3
+*.db
+
+# Node / frontend
 node_modules/
 admin-frontend/node_modules/
+admin-frontend/dist/
+admin-frontend/auto-imports.d.ts
+admin-frontend/components.d.ts
 
-# IDE
+# IDE and editor files
 .idea/
 .vscode/
 *.swp
 *.swo
 
-# OS
+# OS files
 .DS_Store
 Thumbs.db
 
-# Logs
-*.log
-data/
-
-# Environment
+# Local environment files
 .env
 .env.local
-
-# Test
-.pytest_cache/
-.coverage
-htmlcov/

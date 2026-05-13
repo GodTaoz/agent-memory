@@ -17,6 +17,18 @@ class TestRESTAPI:
         assert app is not None
         assert app.title == "Memory MCP Server"
 
+    def test_root_serves_admin_frontend_when_static_exists(self):
+        """Test root route serves built admin frontend."""
+        mock_engine = MagicMock()
+        app = create_app(mock_engine)
+        client = TestClient(app)
+
+        response = client.get("/")
+
+        assert response.status_code == 200
+        assert "text/html" in response.headers["content-type"]
+        assert "<div id=\"app\"></div>" in response.text
+
     def test_health_endpoint(self):
         """Test health endpoint."""
         mock_engine = MagicMock()

@@ -209,7 +209,7 @@ def create_app(engine: MemoryEngine, auth_config: Optional[Dict[str, Any]] = Non
         }
     
     # Serve admin frontend static files
-    static_dir = Path(__file__).parent.parent.parent / "admin" / "static"
+    static_dir = Path(__file__).resolve().parent.parent / "admin" / "static"
     if static_dir.exists():
         app.mount("/assets", StaticFiles(directory=str(static_dir / "assets")), name="assets")
         

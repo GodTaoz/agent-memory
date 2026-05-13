@@ -44,11 +44,17 @@ dev = [
     "mypy>=1.0.0",
 ]
 all = [
-    "memory-mcp[mcp,dev]",
+    "mcp>=1.0.0",
+    "pytest>=7.0.0",
+    "pytest-asyncio>=0.21.0",
+    "pytest-cov>=4.0.0",
+    "black>=23.0.0",
+    "flake8>=6.0.0",
+    "mypy>=1.0.0",
 ]
 
 [project.scripts]
-memory-mcp = "memory_mcp.main:cli"
+memory-mcp = "memory_mcp.main:run"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/memory_mcp"]

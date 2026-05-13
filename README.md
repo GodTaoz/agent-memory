@@ -1,98 +1,192 @@
-# Memory MCP Server
+# agent-memory
 
-> 🧠 Universal Memory Service for AI Agents
+> A lightweight, local-first memory service for AI agents with **MCP + REST API**, built-in **admin panel**, and **zero external API cost**.
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
-[![Tests](https://img.shields.io/badge/tests-111%20passed-brightgreen.svg)](https://github.com/GodTaoz/agent-memory/actions)
+[![License: MIT](https://img.shields.io/badge/license-MIT-yellow.svg)](LICENSE)
+[![Python](https://img.shields.io/badge/python-3.10%2B-blue.svg)](https://www.python.org/)
+[![Branch](https://img.shields.io/badge/default%20branch-master-blueviolet.svg)](https://github.com/GodTaoz/agent-memory)
 
----
+`agent-memory` helps multiple AI agents share durable memory through standard protocols instead of re-embedding state into every conversation.
+It is designed to be:
 
-## 简介
-
-Memory MCP Server 是一个通用的AI Agent记忆服务，基于MCP协议和REST API，支持多Agent接入和权限隔离。
-
-**核心特性：**
-- 🔌 **双协议支持** - MCP + REST API
-- 👥 **多Agent支持** - 任意数量的Agent接入
-- 🔒 **权限隔离** - 基于ACL的读写权限控制
-- 🔍 **智能搜索** - 多级索引 + 同义词扩展
-- 🔄 **记忆演化** - 自动合并相似记忆
-- 🐳 **一键部署** - Docker + Compose
-- 💰 **零API成本** - 纯本地运行，无需LLM API
+- **Lightweight**: Redis only, no vector DB required for v1
+- **Protocol-friendly**: MCP for agent-native integration, REST for universal access
+- **Local-first**: deploy on your own machine or NAS
+- **Secure by default (baseline)**: API key auth for REST, admin login for the panel
+- **Operable**: built-in web admin panel for inspection, API key management, and monitoring
 
 ---
 
-## 与Mem0对比
+## Features
 
-| 维度 | Mem0 | Memory MCP Server |
-|------|------|-------------------|
-| **部署复杂度** | 需要向量DB+LLM | **只需Redis** |
-| **运行成本** | LLM API费用 | **零API成本** |
-| **协议支持** | Python/Node SDK | **MCP + REST** |
-| **语义理解** | ✅ 强（向量搜索） | ⚠️ 关键词+同义词 |
-| **适用场景** | 高级语义需求 | **快速接入、本地优先** |
+### Core memory service
+- MCP + REST dual protocol support
+- Redis-backed persistence
+- Memory CRUD and list/search APIs
+- Multi-level indexing: agent / tag / keyword / time
+- Memory evolution hooks for future merge and semantic upgrades
+- ACL-oriented multi-agent isolation foundation
+
+### Admin panel
+- Single-port deployment on **`5678`**
+- Vue 3 + Element Plus frontend
+- Light / dark / system theme switching
+- Dashboard for service overview
+- API key management view
+- Memory browse / search / edit / delete / export
+- Agent activity overview
+- SQLite-backed admin and access logs
+- Admin password login, with in-panel password change
+
+### Security
+- REST API key authentication
+- Supported auth methods:
+  - `Authorization: Bearer <api_key>`
+  - `X-API-Key: <api_key>`
+  - `?api_key=<api_key>`
+- Separate admin login flow for the management panel
+- Recommended production hardening: HTTPS, firewall/IP whitelist, key rotation
 
 ---
 
-## 快速开始
+## Architecture
 
-### 方式1：Docker Compose（推荐）
+```text
+Browser
+  └─ http://host:5678/
+       ├─ /admin/api/*        Admin backend (FastAPI)
+       ├─ /assets/*           Built Vue frontend assets
+       ├─ /api/v1/*           Memory REST API
+       └─ /                   Admin panel entry
+
+AI Agents
+  ├─ MCP client  ─────────────┐
+  └─ REST client ─────────────┤
+                              ▼
+                    agent-memory service
+                      ├─ protocol layer
+                      ├─ auth layer
+                      ├─ memory engine
+                      ├─ index manager
+                      ├─ admin module
+                      └─ Redis / SQLite
+```
+
+---
+
+## Quick start
+
+### Option 1: Docker Compose
 
 ```bash
-# 克隆项目
 git clone https://github.com/GodTaoz/agent-memory.git
 cd agent-memory
 
-# 启动服务
-docker-compose up -d
+cp config/config.example.yaml config/config.yaml
+cp config/permissions.example.yaml config/permissions.yaml
 
-# 验证服务
+# optional: export runtime secrets
+export REDIS_PASSWORD='your-redis-password'
+export API_KEYS='agent-key-1,agent-key-2'
+export ADMIN_PASSWORD_HASH=''
+export ADMIN_PASSWORD_SALT=''
+
+docker-compose up -d
+```
+
+Then open:
+
+- Admin panel: `http://localhost:5678/`
+- Health check: `http://localhost:5678/api/v1/health`
+
+### Option 2: Local development
+
+```bash
+git clone https://github.com/GodTaoz/agent-memory.git
+cd agent-memory
+
+python3 -m venv venv
+source venv/bin/activate
+pip install -e ".[all]"
+
+# start backend
+uvicorn memory_mcp.main:create_app --factory --host 0.0.0.0 --port 5678
+```
+
+If you want to run via console script after installation:
+
+```bash
+memory-mcp
+```
+
+---
+
+## Admin panel
+
+The admin panel is served from the same port as the API.
+
+- URL: `http://<host>:5678/`
+- Default password: `admin123`
+- **Important:** change it immediately after the first login
+
+### Current panel scope
+
+- Dashboard / service stats
+- API key management
+- Memory inspection and editing
+- Agent overview
+- Operation / login / API access logs
+- Export entry points
+- Theme switching: light / dark / follow system
+
+Admin logs are stored in SQLite by default:
+
+- default file: `data/admin_logs.db`
+
+---
+
+## REST API usage
+
+### Save memory
+
+```bash
+curl -X POST http://localhost:5678/api/v1/memories \
+  -H 'Content-Type: application/json' \
+  -H 'X-API-Key: your-api-key' \
+  -d '{
+    "content": "User prefers concise and elegant code.",
+    "tags": ["preference", "coding"],
+    "agent": "hermes"
+  }'
+```
+
+### Search memory
+
+```bash
+curl 'http://localhost:5678/api/v1/memories?q=concise&agent=hermes&api_key=your-api-key'
+```
+
+### Health check
+
+```bash
 curl http://localhost:5678/api/v1/health
 ```
 
-### 方式2：本地安装
+### Main endpoints
 
-```bash
-# 克隆项目
-git clone https://github.com/GodTaoz/agent-memory.git
-cd agent-memory
-
-# 创建虚拟环境
-python3 -m venv venv
-source venv/bin/activate
-
-# 安装依赖
-pip install -e ".[all]"
-
-# 启动服务
-uvicorn src.memory_mcp.protocol.rest:create_app --factory --host 0.0.0.0 --port 5678
-```
+- `POST /api/v1/memories`
+- `GET /api/v1/memories/{id}`
+- `PUT /api/v1/memories/{id}`
+- `DELETE /api/v1/memories/{id}`
+- `GET /api/v1/memories`
+- `GET /api/v1/health`
+- `GET /api/v1/stats`
 
 ---
 
-## 使用示例
+## MCP integration
 
-### REST API
-
-```bash
-# 保存记忆
-curl -X POST http://localhost:5678/api/v1/memories \
-  -H "Content-Type: application/json" \
-  -d '{
-    "content": "用户喜欢简洁的代码风格",
-    "tags": ["preference", "code"],
-    "agent": "hermes"
-  }'
-
-# 搜索记忆
-curl "http://localhost:5678/api/v1/memories?q=代码&agent=hermes"
-
-# 获取记忆
-curl http://localhost:5678/api/v1/memories/{memory_id}
-```
-
-### MCP Client
+Example stdio client usage:
 
 ```python
 from mcp import ClientSession, StdioServerParameters
@@ -100,265 +194,131 @@ from mcp.client.stdio import stdio_client
 
 server_params = StdioServerParameters(
     command="python",
-    args=["-m", "memory_mcp.protocol.mcp"]
+    args=["-m", "memory_mcp.protocol.mcp"],
 )
 
 async with stdio_client(server_params) as (read, write):
     async with ClientSession(read, write) as session:
         await session.initialize()
-        
-        # 保存记忆
-        result = await session.call_tool("memory.save", {
-            "content": "用户喜欢简洁的代码风格",
-            "tags": ["preference", "code"]
-        })
-        
-        # 搜索记忆
-        results = await session.call_tool("memory.search", {
-            "query": "代码"
+        await session.call_tool("memory.save", {
+            "content": "User prefers concise and elegant code.",
+            "tags": ["preference", "coding"],
         })
 ```
 
 ---
 
-## API文档
+## Configuration
 
-### REST API端点
+### Environment variables
 
-| 方法 | 路径 | 描述 |
-|------|------|------|
-| `POST` | `/api/v1/memories` | 创建记忆 |
-| `GET` | `/api/v1/memories/{id}` | 获取记忆 |
-| `PUT` | `/api/v1/memories/{id}` | 更新记忆 |
-| `DELETE` | `/api/v1/memories/{id}` | 删除记忆 |
-| `GET` | `/api/v1/memories` | 搜索/列表 |
-| `GET` | `/api/v1/health` | 健康检查 |
-| `GET` | `/api/v1/stats` | 统计信息 |
+| Variable | Default | Description |
+|---|---|---|
+| `SERVER_HOST` | `0.0.0.0` | Bind host |
+| `SERVER_PORT` | `5678` | Service port |
+| `REDIS_HOST` | `localhost` | Redis host |
+| `REDIS_PORT` | `6379` | Redis port |
+| `REDIS_PASSWORD` | empty | Redis password |
+| `REDIS_DB` | `0` | Redis database index |
+| `API_KEYS` | empty | Comma-separated REST API keys |
+| `ADMIN_PASSWORD_HASH` | empty | Optional hashed admin password |
+| `ADMIN_PASSWORD_SALT` | empty | Salt for the hashed admin password |
+| `ADMIN_LOG_DB_PATH` | `data/admin_logs.db` | SQLite path for admin logs |
+| `LOG_LEVEL` | `INFO` | Log level |
 
-### MCP工具
+### Config files
 
-| 工具 | 描述 |
-|------|------|
-| `memory.save` | 保存记忆 |
-| `memory.get` | 获取记忆 |
-| `memory.search` | 搜索记忆 |
-| `memory.update` | 更新记忆 |
-| `memory.delete` | 删除记忆 |
-| `memory.list` | 列出记忆 |
-| `memory.health` | 健康检查 |
-| `memory.stats` | 统计信息 |
+- `config/config.yaml` - server / Redis / search / logging config
+- `config/permissions.yaml` - agent permissions / ACL-related config
 
----
+You can start from:
 
-## 配置
-
-### 环境变量
-
-| 变量 | 默认值 | 说明 |
-|------|--------|------|
-| `REDIS_HOST` | `localhost` | Redis主机 |
-| `REDIS_PORT` | `6379` | Redis端口 |
-| `REDIS_PASSWORD` | `` | Redis密码 |
-| `SERVER_HOST` | `0.0.0.0` | 服务监听地址 |
-| `SERVER_PORT` | `5678` | 服务端口 |
-| `LOG_LEVEL` | `INFO` | 日志级别 |
-
-### 配置文件
-
-**config/config.yaml:**
-```yaml
-server:
-  host: "0.0.0.0"
-  port: 5678
-
-redis:
-  host: "localhost"
-  port: 6379
-  key_prefix: "memory"
-
-memory:
-  similarity_threshold: 0.3
-  max_tags: 20
-
-search:
-  enable_synonyms: true
-  enable_fuzzy: true
-```
-
-**config/permissions.yaml:**
-```yaml
-agents:
-  hermes:
-    permissions:
-      namespace: "hermes:*"
-      operations: ["read", "write", "delete"]
-      admin: true
-
-  codex:
-    permissions:
-      namespace: "codex:*"
-      operations: ["read", "write"]
-      shared_read: true
-```
+- `config/config.example.yaml`
+- `config/permissions.example.yaml`
 
 ---
 
-## Agent接入指南
+## Frontend development
 
-### Hermes Agent
-
-编辑 `~/.hermes/config.yaml`:
-
-```yaml
-mcp_servers:
-  memory:
-    url: "http://your-server:5678/mcp"
-```
-
-### Codex CLI
-
-编辑 `~/.codex/config.toml`:
-
-```toml
-[mcp_servers.memory]
-url = "http://your-server:5678/mcp"
-```
-
-### Claude Code
-
-编辑 `~/.claude/config.json`:
-
-```json
-{
-  "mcpServers": {
-    "memory": {
-      "url": "http://your-server:5678/mcp"
-    }
-  }
-}
-```
-
----
-
-## 架构
-
-```
-┌─────────────────────────────────────────────────────────────┐
-│                 Memory MCP Server                           │
-│                                                             │
-│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐      │
-│  │  MCP Server  │  │  REST API    │  │  权限管理    │      │
-│  │  (协议层)    │  │  (协议层)    │  │  (ACL)       │      │
-│  └──────┬───────┘  └──────┬───────┘  └──────┬───────┘      │
-│         └─────────────────┼─────────────────┘              │
-│                           │                                │
-│  ┌────────────────────────▼────────────────────────┐       │
-│  │              Memory Engine                       │       │
-│  │  ┌────────────┐  ┌────────────┐  ┌────────────┐ │       │
-│  │  │ 演化引擎   │  │ 多级索引   │  │ 搜索引擎   │ │       │
-│  │  └────────────┘  └────────────┘  └────────────┘ │       │
-│  └────────────────────────┬────────────────────────┘       │
-│                           │                                │
-│                    ┌──────▼───────┐                        │
-│                    │    Redis     │                        │
-│                    └──────────────┘                        │
-└─────────────────────────────────────────────────────────────┘
-```
-
----
-
-## 开发
-
-### 运行测试
+The admin frontend lives in `admin-frontend/`.
 
 ```bash
-# 安装开发依赖
-pip install -e ".[dev]"
+cd admin-frontend
+npm install
+npm run build
+```
 
-# 运行所有测试
+The built files are published to:
+
+- `src/memory_mcp/admin/static/`
+
+This repository keeps the built static assets in version control so the admin panel can be served directly by the backend in deployments.
+
+---
+
+## Development
+
+### Run tests
+
+```bash
 pytest
-
-# 运行测试并生成覆盖率报告
-pytest --cov=src/memory_mcp --cov-report=html
 ```
 
-### 代码检查
+### Suggested checks
 
 ```bash
-# 格式化代码
-black src/ tests/
-
-# 检查代码风格
-flake8 src/ tests/
-
-# 类型检查
-mypy src/
+black src tests
+flake8 src tests
+mypy src
 ```
+
+### Branch policy
+
+This repository uses **`master`** as the default working branch.
 
 ---
 
-## 测试覆盖
+## Project structure
 
-**总计：111个测试，全部通过！**
-
-| 模块 | 测试数 | 状态 |
-|------|--------|------|
-| models | 9 | ✅ |
-| config | 8 | ✅ |
-| redis_backend | 11 | ✅ |
-| index | 12 | ✅ |
-| memory_engine | 12 | ✅ |
-| evolution | 11 | ✅ |
-| search | 14 | ✅ |
-| mcp | 13 | ✅ |
-| rest | 10 | ✅ |
-| acl | 11 | ✅ |
-
----
-
-## 项目结构
-
-```
+```text
 agent-memory/
+├── admin-frontend/              # Vue 3 admin UI source
+├── config/                      # Example and runtime config
 ├── src/memory_mcp/
-│   ├── __init__.py
-│   ├── config.py           # 配置管理
-│   ├── models.py           # 数据模型
-│   ├── engine/
-│   │   ├── memory.py       # 记忆引擎
-│   │   ├── evolution.py    # 演化引擎
-│   │   └── search.py       # 搜索引擎
-│   ├── storage/
-│   │   ├── redis_backend.py # Redis存储
-│   │   └── index.py        # 索引管理
-│   ├── protocol/
-│   │   ├── mcp.py          # MCP Server
-│   │   └── rest.py         # REST API
-│   └── auth/
-│       └── acl.py          # 权限管理
-├── tests/                  # 测试文件
-├── config/                 # 配置文件
-├── Dockerfile              # Docker构建
-├── docker-compose.yml      # Docker Compose
-└── pyproject.toml          # 项目配置
+│   ├── admin/                   # Admin backend + built static files
+│   ├── auth/                    # Auth and ACL modules
+│   ├── engine/                  # Memory lifecycle logic
+│   ├── protocol/                # MCP / REST interfaces
+│   ├── storage/                 # Redis backend and indexes
+│   ├── config.py                # Config loader
+│   ├── models.py                # Data model
+│   └── main.py                  # Runtime entrypoint
+├── tests/                       # Test suite
+├── Dockerfile
+├── docker-compose.yml
+└── pyproject.toml
 ```
 
 ---
 
-## 贡献
+## Security notes
 
-欢迎贡献！请阅读 [CONTRIBUTING.md](CONTRIBUTING.md) 了解详情。
+Current baseline security includes REST API key auth and admin login, but for production you should still add:
+
+- HTTPS / TLS
+- reverse proxy (Nginx / Caddy) if exposed publicly
+- firewall or source IP restrictions
+- strong random API keys
+- password rotation and audit review
 
 ---
 
-## 许可证
+## Contributing
 
-MIT License - 详见 [LICENSE](LICENSE)
+See [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ---
 
-## 致谢
+## License
 
-- [Model Context Protocol](https://modelcontextprotocol.io/) - MCP协议规范
-- [FastAPI](https://fastapi.tiangolo.com/) - Web框架
-- [Redis](https://redis.io/) - 存储引擎
+This project is licensed under the [MIT License](LICENSE).
