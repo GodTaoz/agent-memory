@@ -6,11 +6,13 @@ This module implements the REST API endpoints for memory operations.
 import logging
 from typing import Any, Dict, List, Optional
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 
 from memory_mcp.engine.memory import MemoryEngine
 from memory_mcp.models import Memory
+from memory_mcp.auth.middleware import AuthMiddleware
 
 logger = logging.getLogger(__name__)
 
@@ -57,11 +59,12 @@ class SuccessResponse(BaseModel):
     message: Optional[str] = None
 
 
-def create_app(engine: MemoryEngine) -> FastAPI:
+def create_app(engine: MemoryEngine, auth_config: Optional[Dict[str, Any]] = None) -> FastAPI:
     """Create FastAPI application.
     
     Args:
         engine: Memory engine instance
+        auth_config: Authentication configuration (optional)
         
     Returns:
         FastAPI application
@@ -71,6 +74,31 @@ def create_app(engine: MemoryEngine) -> FastAPI:
         description="Universal Memory Service for AI Agents",
         version="0.1.0"
     )
+    
+    # Initialize auth middleware
+    auth_middleware = AuthMiddleware(auth_config or {})
+    
+    @app.middleware("http")
+    async def auth_middleware_handler(request: Request, call_next):
+        """Authentication middleware."""
+        # Skip auth for health check (optional)
+        # if request.url.path == "/api/v1/health":
+        #     return await call_next(request)
+        
+        # Extract API key
+        api_key = auth_middleware.extract_api_key(
+            dict(request.headers),
+            dict(request.query_params)
+        )
+        
+        # Validate API key
+        if not auth_middleware.validate_api_key(api_key):
+            return JSONResponse(
+                status_code=401,
+                content={"error": "Invalid or missing API key"}
+            )
+        
+        return await call_next(request)
     
     @app.get("/api/v1/health")
     async def health():
