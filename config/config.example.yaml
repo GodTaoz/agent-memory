@@ -1,0 +1,31 @@
+# Server configuration
+server:
+  host: "0.0.0.0"
+  port: 8080
+  workers: 1
+
+# Redis configuration
+redis:
+  host: "localhost"
+  port: 6379
+  password: ""
+  db: 0
+  key_prefix: "memory"
+
+# Memory configuration
+memory:
+  max_content_length: 10000
+  similarity_threshold: 0.3
+  max_tags: 20
+  default_ttl: null  # null means no expiration
+
+# Search configuration
+search:
+  max_results: 100
+  enable_synonyms: true
+  enable_fuzzy: true
+
+# Logging configuration
+logging:
+  level: "INFO"
+  format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"

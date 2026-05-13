@@ -1,0 +1,32 @@
+# Agent permissions configuration
+# Each agent has a namespace pattern and allowed operations
+
+agents:
+  hermes:
+    name: "Hermes Agent"
+    description: "Main AI assistant"
+    permissions:
+      namespace: "hermes:*"
+      operations: ["read", "write", "delete"]
+      admin: true
+
+  codex:
+    name: "Codex CLI"
+    description: "Codex command line tool"
+    permissions:
+      namespace: "codex:*"
+      operations: ["read", "write"]
+      shared_read: true
+
+  claude-code:
+    name: "Claude Code"
+    description: "Claude code assistant"
+    permissions:
+      namespace: "claude:*"
+      operations: ["read", "write"]
+
+  # Default permissions for unknown agents
+  default:
+    permissions:
+      namespace: "${agent_id}:*"
+      operations: ["read", "write"]
