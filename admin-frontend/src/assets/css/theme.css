@@ -1,0 +1,195 @@
+/* Theme variables and transitions */
+
+:root {
+  --transition-speed: 0.3s;
+}
+
+/* Theme transition */
+body,
+.el-menu,
+.el-card,
+.el-button,
+.el-input,
+.el-select,
+.el-table,
+.el-dialog,
+.el-drawer {
+  transition: background-color var(--transition-speed),
+              border-color var(--transition-speed),
+              color var(--transition-speed);
+}
+
+/* Dark theme overrides for Element Plus */
+[data-theme="dark"] .el-menu {
+  background-color: var(--bg-primary);
+  border-color: var(--border-color);
+}
+
+[data-theme="dark"] .el-menu-item,
+[data-theme="dark"] .el-sub-menu__title {
+  color: var(--text-secondary);
+}
+
+[data-theme="dark"] .el-menu-item:hover,
+[data-theme="dark"] .el-sub-menu__title:hover {
+  background-color: var(--bg-tertiary);
+  color: var(--text-primary);
+}
+
+[data-theme="dark"] .el-menu-item.is-active {
+  color: var(--accent-color);
+  background-color: rgba(92, 124, 250, 0.1);
+}
+
+[data-theme="dark"] .el-card {
+  background-color: var(--bg-primary);
+  border-color: var(--border-color);
+  color: var(--text-primary);
+}
+
+[data-theme="dark"] .el-button--default {
+  background-color: var(--bg-tertiary);
+  border-color: var(--border-color);
+  color: var(--text-primary);
+}
+
+[data-theme="dark"] .el-button--default:hover {
+  background-color: var(--accent-color);
+  border-color: var(--accent-color);
+  color: #ffffff;
+}
+
+[data-theme="dark"] .el-input__wrapper {
+  background-color: var(--bg-tertiary);
+  border-color: var(--border-color);
+  box-shadow: none;
+}
+
+[data-theme="dark"] .el-input__inner {
+  color: var(--text-primary);
+}
+
+[data-theme="dark"] .el-input__inner::placeholder {
+  color: var(--text-muted);
+}
+
+[data-theme="dark"] .el-table {
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+}
+
+[data-theme="dark"] .el-table th.el-table__cell {
+  background-color: var(--bg-tertiary);
+  color: var(--text-secondary);
+  border-bottom-color: var(--border-color);
+}
+
+[data-theme="dark"] .el-table td.el-table__cell {
+  border-bottom-color: var(--border-color);
+}
+
+[data-theme="dark"] .el-table--enable-row-hover .el-table__body tr:hover > td.el-table__cell {
+  background-color: var(--bg-tertiary);
+}
+
+[data-theme="dark"] .el-dialog {
+  background-color: var(--bg-primary);
+  border-color: var(--border-color);
+}
+
+[data-theme="dark"] .el-dialog__title {
+  color: var(--text-primary);
+}
+
+[data-theme="dark"] .el-dialog__body {
+  color: var(--text-secondary);
+}
+
+[data-theme="dark"] .el-drawer {
+  background-color: var(--bg-primary);
+}
+
+[data-theme="dark"] .el-drawer__header {
+  color: var(--text-primary);
+  border-bottom-color: var(--border-color);
+}
+
+[data-theme="dark"] .el-pagination {
+  --el-pagination-bg-color: var(--bg-primary);
+  --el-pagination-text-color: var(--text-secondary);
+  --el-pagination-button-bg-color: var(--bg-tertiary);
+}
+
+[data-theme="dark"] .el-tag {
+  --el-tag-bg-color: var(--bg-tertiary);
+  --el-tag-border-color: var(--border-color);
+  --el-tag-text-color: var(--text-secondary);
+}
+
+[data-theme="dark"] .el-breadcrumb__inner {
+  color: var(--text-secondary);
+}
+
+[data-theme="dark"] .el-breadcrumb__inner.is-link:hover {
+  color: var(--accent-color);
+}
+
+/* Gradient accents */
+.gradient-accent {
+  background: linear-gradient(135deg, var(--accent-color), #7c3aed);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* Card hover effect */
+.card-hover {
+  transition: transform var(--transition-speed), box-shadow var(--transition-speed);
+}
+
+.card-hover:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-md);
+}
+
+/* Status indicator */
+.status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  display: inline-block;
+}
+
+.status-dot.success {
+  background-color: var(--success-color);
+  box-shadow: 0 0 6px var(--success-color);
+}
+
+.status-dot.warning {
+  background-color: var(--warning-color);
+  box-shadow: 0 0 6px var(--warning-color);
+}
+
+.status-dot.danger {
+  background-color: var(--danger-color);
+  box-shadow: 0 0 6px var(--danger-color);
+}
+
+/* Animated gradient background for login */
+.gradient-bg {
+  background: linear-gradient(-45deg, #ee7752, #e73c7e, #23a6d5, #23d5ab);
+  background-size: 400% 400%;
+  animation: gradient 15s ease infinite;
+}
+
+@keyframes gradient {
+  0% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0% 50%;
+  }
+}
