@@ -96,8 +96,12 @@ class TestAuthIntegration:
         app = create_app(mock_engine, auth_config=auth_config)
         client = TestClient(app)
         
-        # Request without API key should fail
+        # Health endpoint is public, should succeed without API key
         response = client.get("/api/v1/health")
+        assert response.status_code == 200
+        
+        # Other endpoints should fail without API key
+        response = client.get("/api/v1/memories")
         assert response.status_code == 401
 
     def test_request_with_valid_api_key(self):
@@ -131,9 +135,9 @@ class TestAuthIntegration:
         app = create_app(mock_engine, auth_config=auth_config)
         client = TestClient(app)
         
-        # Request with invalid API key should fail
+        # Request with invalid API key should fail for protected endpoints
         response = client.get(
-            "/api/v1/health",
+            "/api/v1/memories",
             headers={"Authorization": "Bearer invalid-key"}
         )
         assert response.status_code == 401

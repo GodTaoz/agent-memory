@@ -13,7 +13,7 @@ class Config:
     
     # Server settings
     server_host: str = "0.0.0.0"
-    server_port: int = 8080
+    server_port: int = 5678
     server_workers: int = 1
     
     # Redis settings

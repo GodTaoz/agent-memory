@@ -15,7 +15,7 @@ class TestConfig:
         config = Config()
         
         assert config.server_host == "0.0.0.0"
-        assert config.server_port == 8080
+        assert config.server_port == 5678
         assert config.redis_host == "localhost"
         assert config.redis_port == 6379
         assert config.redis_password == ""
@@ -85,7 +85,7 @@ class TestConfig:
         config = load_config("/nonexistent/config.yaml")
         
         assert config.server_host == "0.0.0.0"
-        assert config.server_port == 8080
+        assert config.server_port == 5678
 
 
 class TestConfigEnvironmentVariables:

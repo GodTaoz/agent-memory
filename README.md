@@ -48,7 +48,7 @@ cd agent-memory
 docker-compose up -d
 
 # 验证服务
-curl http://localhost:8080/api/v1/health
+curl http://localhost:5678/api/v1/health
 ```
 
 ### 方式2：本地安装
@@ -66,7 +66,7 @@ source venv/bin/activate
 pip install -e ".[all]"
 
 # 启动服务
-uvicorn src.memory_mcp.protocol.rest:create_app --factory --host 0.0.0.0 --port 8080
+uvicorn src.memory_mcp.protocol.rest:create_app --factory --host 0.0.0.0 --port 5678
 ```
 
 ---
@@ -77,7 +77,7 @@ uvicorn src.memory_mcp.protocol.rest:create_app --factory --host 0.0.0.0 --port 
 
 ```bash
 # 保存记忆
-curl -X POST http://localhost:8080/api/v1/memories \
+curl -X POST http://localhost:5678/api/v1/memories \
   -H "Content-Type: application/json" \
   -d '{
     "content": "用户喜欢简洁的代码风格",
@@ -86,10 +86,10 @@ curl -X POST http://localhost:8080/api/v1/memories \
   }'
 
 # 搜索记忆
-curl "http://localhost:8080/api/v1/memories?q=代码&agent=hermes"
+curl "http://localhost:5678/api/v1/memories?q=代码&agent=hermes"
 
 # 获取记忆
-curl http://localhost:8080/api/v1/memories/{memory_id}
+curl http://localhost:5678/api/v1/memories/{memory_id}
 ```
 
 ### MCP Client
@@ -160,7 +160,7 @@ async with stdio_client(server_params) as (read, write):
 | `REDIS_PORT` | `6379` | Redis端口 |
 | `REDIS_PASSWORD` | `` | Redis密码 |
 | `SERVER_HOST` | `0.0.0.0` | 服务监听地址 |
-| `SERVER_PORT` | `8080` | 服务端口 |
+| `SERVER_PORT` | `5678` | 服务端口 |
 | `LOG_LEVEL` | `INFO` | 日志级别 |
 
 ### 配置文件
@@ -169,7 +169,7 @@ async with stdio_client(server_params) as (read, write):
 ```yaml
 server:
   host: "0.0.0.0"
-  port: 8080
+  port: 5678
 
 redis:
   host: "localhost"
@@ -212,7 +212,7 @@ agents:
 ```yaml
 mcp_servers:
   memory:
-    url: "http://your-server:8080/mcp"
+    url: "http://your-server:5678/mcp"
 ```
 
 ### Codex CLI
@@ -221,7 +221,7 @@ mcp_servers:
 
 ```toml
 [mcp_servers.memory]
-url = "http://your-server:8080/mcp"
+url = "http://your-server:5678/mcp"
 ```
 
 ### Claude Code
@@ -232,7 +232,7 @@ url = "http://your-server:8080/mcp"
 {
   "mcpServers": {
     "memory": {
-      "url": "http://your-server:8080/mcp"
+      "url": "http://your-server:5678/mcp"
     }
   }
 }
