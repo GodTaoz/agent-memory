@@ -156,6 +156,43 @@ class TestACL:
         # Should deny writing shared memories
         assert acl.check_permission("codex", "write", "shared:memory:123") is False
 
+    def test_check_permission_shared_read_uses_configured_shared_namespaces(self):
+        """Test shared read permission with configurable shared namespaces."""
+        config = {
+            "shared_namespaces": ["shared", "team"],
+            "agents": {
+                "codex": {
+                    "permissions": {
+                        "namespace": "codex:*",
+                        "operations": ["read", "write"],
+                        "shared_read": True
+                    }
+                }
+            }
+        }
+        acl = ACL(config)
+
+        assert acl.check_permission("codex", "read", "shared:memory:123") is True
+        assert acl.check_permission("codex", "read", "team:memory:123") is True
+        assert acl.check_permission("codex", "write", "team:memory:123") is False
+
+    def test_check_permission_shared_read_denied_without_flag_even_for_shared_namespace(self):
+        """Test shared namespaces still require shared_read permission."""
+        config = {
+            "shared_namespaces": ["shared", "team"],
+            "agents": {
+                "claude": {
+                    "permissions": {
+                        "namespace": "claude:*",
+                        "operations": ["read", "write"]
+                    }
+                }
+            }
+        }
+        acl = ACL(config)
+
+        assert acl.check_permission("claude", "read", "team:memory:123") is False
+
     def test_get_agent_permissions(self):
         """Test getting agent permissions."""
         config = {

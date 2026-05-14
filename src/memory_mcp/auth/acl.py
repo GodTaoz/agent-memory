@@ -20,6 +20,20 @@ class ACL:
         """
         self._config = config
 
+    def _get_shared_namespaces(self) -> List[str]:
+        """Return configured shared namespaces.
+
+        Defaults to the legacy ``shared`` namespace when not configured.
+        """
+        namespaces = self._config.get("shared_namespaces")
+        if not namespaces:
+            return ["shared"]
+        return [str(namespace) for namespace in namespaces]
+
+    def _is_shared_resource(self, resource: str) -> bool:
+        """Check whether a resource belongs to a shared namespace."""
+        return any(resource.startswith(f"{namespace}:") for namespace in self._get_shared_namespaces())
+
     def _match_namespace(self, pattern: str, resource: str, agent_id: str) -> bool:
         """Check if a resource matches a namespace pattern.
         
@@ -88,7 +102,7 @@ class ACL:
         
         # Check shared_read permission
         if permissions.get("shared_read", False) and operation == "read":
-            if resource.startswith("shared:"):
+            if self._is_shared_resource(resource):
                 return True
         
         return False
