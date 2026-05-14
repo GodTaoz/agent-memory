@@ -1,5 +1,7 @@
 # agent-memory
 
+**Language / 语言：** [![English](https://img.shields.io/badge/English-README-blue)](README.md) [![简体中文](https://img.shields.io/badge/简体中文-README-green)](README.zh-CN.md)
+
 > A lightweight, local-first memory service for AI agents with **MCP + REST API**, built-in **admin panel**, and **zero external API cost**.
 
 [![License: MIT](https://img.shields.io/badge/license-MIT-yellow.svg)](LICENSE)
