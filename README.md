@@ -247,7 +247,7 @@ tools = server.get_tools()
 ### Config files
 
 - `config/config.yaml` - server / Redis / search / logging config
-- `config/permissions.yaml` - example ACL-related config for future isolation work; the current FastAPI startup path does not load it yet
+- `config/permissions.yaml` - ACL-related config loaded by the FastAPI startup path for runtime isolation wiring
 
 You can start from:
 

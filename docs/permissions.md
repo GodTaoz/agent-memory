@@ -162,6 +162,6 @@ Verified behaviors covered by tests:
 
 ## Known limitation
 
-The repository contains the ACL foundation and configuration examples, but the current FastAPI startup path still does not fully wire `config/permissions.yaml` into runtime enforcement for every protocol surface.
+The repository now loads `config/permissions.yaml` during FastAPI startup and attaches the ACL object to application runtime state.
 
-So this document describes the intended contract and the verified ACL component behavior, while broader end-to-end enforcement remains ongoing roadmap work.
+End-to-end enforcement is still incomplete across every protocol surface, so this document describes both the wired runtime foundation and the broader target contract for future isolation work.

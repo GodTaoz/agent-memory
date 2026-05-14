@@ -7,7 +7,9 @@ from pathlib import Path
 from typing import Any, Dict
 
 import uvicorn
+import yaml
 
+from memory_mcp.auth.acl import ACL
 from memory_mcp.config import load_config
 from memory_mcp.engine.memory import MemoryEngine
 from memory_mcp.protocol.rest import create_app as create_rest_app
@@ -19,6 +21,16 @@ def _load_auth_config() -> Dict[str, Any]:
     """Load API key configuration from environment variables."""
     api_keys = [key.strip() for key in os.environ.get("API_KEYS", "").split(",") if key.strip()]
     return {"api_keys": api_keys}
+
+
+def _load_permissions_config() -> Dict[str, Any]:
+    """Load ACL configuration from config/permissions.yaml when present."""
+    permissions_path = _project_root() / "config" / "permissions.yaml"
+    if not permissions_path.exists():
+        return {}
+
+    with permissions_path.open("r", encoding="utf-8") as handle:
+        return yaml.safe_load(handle) or {}
 
 
 def _project_root() -> Path:
@@ -43,7 +55,12 @@ def create_app():
     index = IndexManager(backend._ensure_connected(), prefix=config.redis_key_prefix)
     engine = MemoryEngine(backend, index)
 
-    return create_rest_app(engine, auth_config=_load_auth_config())
+    auth_config = _load_auth_config()
+    acl_config = _load_permissions_config()
+    if acl_config:
+        auth_config["acl"] = ACL(acl_config)
+
+    return create_rest_app(engine, auth_config=auth_config)
 
 
 def run() -> None:

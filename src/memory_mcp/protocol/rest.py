@@ -87,12 +87,14 @@ def create_app(engine: MemoryEngine, auth_config: Optional[Dict[str, Any]] = Non
     app.state.api_key_store = ApiKeyStore(bootstrap_keys=auth_config.get("api_keys", []))
     app.state.admin_logger = get_logger()
     app.state.started_at = datetime.now()
+    app.state.acl = auth_config.get("acl")
 
     # Include admin routes
     app.include_router(admin_router)
     
     # Initialize auth middleware
     auth_middleware = AuthMiddleware({**auth_config, "api_key_store": app.state.api_key_store})
+    app.state.auth_middleware = auth_middleware
     
     # Paths that don't require API key authentication
     PUBLIC_PATHS = [

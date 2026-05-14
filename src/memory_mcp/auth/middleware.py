@@ -20,6 +20,7 @@ class AuthMiddleware:
         """
         self._api_keys: List[str] = config.get("api_keys", [])
         self._api_key_store = config.get("api_key_store")
+        self._acl = config.get("acl")
 
     def validate_api_key(self, api_key: Optional[str]) -> bool:
         """Validate an API key."""
