@@ -6,6 +6,23 @@ from fastapi.testclient import TestClient
 from memory_mcp.protocol.rest import create_app
 
 
+def make_memory_dict(memory_id: str, content: str) -> dict:
+    """Build a complete memory payload for REST response validation."""
+    return {
+        "id": memory_id,
+        "content": content,
+        "tags": [],
+        "agent": "",
+        "created_at": "2026-01-01T00:00:00",
+        "updated_at": "2026-01-01T00:00:00",
+        "version": 1,
+        "confidence": "high",
+        "source": "user",
+        "links": [],
+        "metadata": {},
+    }
+
+
 class TestRESTAPI:
     """Test REST API endpoints."""
 
@@ -166,8 +183,8 @@ class TestRESTAPI:
         """Test listing memories."""
         mock_engine = MagicMock()
         mock_engine.list_memories.return_value = [
-            MagicMock(to_dict=lambda: {"id": "1", "content": "Memory 1"}),
-            MagicMock(to_dict=lambda: {"id": "2", "content": "Memory 2"})
+            MagicMock(to_dict=lambda: make_memory_dict("1", "Memory 1")),
+            MagicMock(to_dict=lambda: make_memory_dict("2", "Memory 2")),
         ]
         
         app = create_app(mock_engine)
@@ -184,7 +201,7 @@ class TestRESTAPI:
         """Test searching memories."""
         mock_engine = MagicMock()
         mock_engine.search.return_value = [
-            MagicMock(to_dict=lambda: {"id": "1", "content": "Result 1"})
+            MagicMock(to_dict=lambda: make_memory_dict("1", "Result 1"))
         ]
         
         app = create_app(mock_engine)

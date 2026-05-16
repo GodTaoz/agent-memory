@@ -214,3 +214,31 @@ class TestACL:
         assert "hermes" in agents
         assert "codex" in agents
         assert "default" in agents
+
+    def test_init_rejects_non_mapping_agents_section(self):
+        """ACL config should fail closed when agents is not a mapping."""
+        with pytest.raises(ValueError, match="agents"):
+            ACL({"agents": []})
+
+    def test_init_rejects_non_mapping_permissions_section(self):
+        """ACL config should fail closed when permissions is not a mapping."""
+        with pytest.raises(ValueError, match="permissions"):
+            ACL({"agents": {"codex": {"permissions": []}}})
+
+    def test_init_rejects_non_list_operations(self):
+        """ACL config should fail closed when operations is not a list."""
+        with pytest.raises(ValueError, match="operations"):
+            ACL({"agents": {"codex": {"permissions": {"operations": "bread"}}}})
+
+    def test_init_rejects_non_string_namespace(self):
+        """ACL config should fail closed when namespace is not a string."""
+        with pytest.raises(ValueError, match="namespace"):
+            ACL({"agents": {"codex": {"permissions": {"namespace": []}}}})
+
+    def test_init_rejects_non_boolean_permission_flags(self):
+        """ACL config should fail closed when boolean permission flags are not booleans."""
+        with pytest.raises(ValueError, match="shared_read"):
+            ACL({"agents": {"codex": {"permissions": {"shared_read": "false"}}}})
+
+        with pytest.raises(ValueError, match="admin"):
+            ACL({"agents": {"codex": {"permissions": {"admin": "false"}}}})

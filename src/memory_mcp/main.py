@@ -4,9 +4,10 @@ from __future__ import annotations
 
 import os
 from pathlib import Path
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 
 import uvicorn
+import yaml
 
 from memory_mcp.config import load_config
 from memory_mcp.engine.memory import MemoryEngine
@@ -15,10 +16,31 @@ from memory_mcp.storage.index import IndexManager
 from memory_mcp.storage.redis_backend import RedisBackend
 
 
+def _load_permissions_config(path: Optional[Path]) -> Optional[Dict[str, Any]]:
+    """Load ACL permissions config from YAML if present."""
+    if path is None or not path.exists():
+        return None
+
+    with path.open("r", encoding="utf-8") as handle:
+        data = yaml.safe_load(handle) or {}
+
+    if not isinstance(data, dict):
+        raise ValueError(f"Invalid permissions.yaml at {path}: top-level YAML value must be a mapping")
+
+    return data
+
+
 def _load_auth_config() -> Dict[str, Any]:
-    """Load API key configuration from environment variables."""
+    """Load API key configuration from environment variables and optional ACL config."""
     api_keys = [key.strip() for key in os.environ.get("API_KEYS", "").split(",") if key.strip()]
-    return {"api_keys": api_keys}
+    auth_config: Dict[str, Any] = {"api_keys": api_keys}
+
+    permissions_path = _project_root() / "config" / "permissions.yaml"
+    acl_config = _load_permissions_config(permissions_path)
+    if acl_config is not None:
+        auth_config["acl"] = acl_config
+
+    return auth_config
 
 
 def _project_root() -> Path:

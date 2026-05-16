@@ -22,6 +22,7 @@ class ApiKeyRecord:
     last_used: Optional[str]
     usage_count: int
     key_hash: str
+    agent_id: Optional[str] = None
 
     def to_dict(self) -> dict:
         return {
@@ -33,6 +34,7 @@ class ApiKeyRecord:
             "last_used": self.last_used,
             "usage_count": self.usage_count,
             "key_hash": self.key_hash,
+            "agent_id": self.agent_id,
         }
 
     @classmethod
@@ -46,6 +48,7 @@ class ApiKeyRecord:
             last_used=payload.get("last_used"),
             usage_count=payload.get("usage_count", 0),
             key_hash=payload["key_hash"],
+            agent_id=payload.get("agent_id") or payload.get("name"),
         )
 
 
@@ -96,13 +99,21 @@ class ApiKeyStore:
                 "created_at": record.created_at,
                 "last_used": record.last_used,
                 "usage_count": record.usage_count,
+                "agent_id": record.agent_id,
             }
             for record in sorted(self._records, key=lambda item: item.created_at, reverse=True)
         ]
 
-    def create_key(self, name: str, permissions: str = "read", description: Optional[str] = None) -> dict:
+    def create_key(
+        self,
+        name: str,
+        permissions: str = "read",
+        description: Optional[str] = None,
+        agent_id: Optional[str] = None,
+    ) -> dict:
         full_key = f"amk_{secrets.token_urlsafe(24)}"
         created_at = datetime.now().isoformat()
+        resolved_agent_id = agent_id or name
         record = ApiKeyRecord(
             key_preview=self._preview(full_key),
             name=name,
@@ -112,6 +123,7 @@ class ApiKeyStore:
             last_used=None,
             usage_count=0,
             key_hash=self._hash_key(full_key),
+            agent_id=resolved_agent_id,
         )
         self._records.append(record)
         self._enforced = True
@@ -154,26 +166,41 @@ class ApiKeyStore:
                 self._save()
                 return
 
-    def get_key_preview(self, full_key: Optional[str]) -> Optional[str]:
+    def _find_record(self, full_key: Optional[str]) -> Optional[ApiKeyRecord]:
         if not full_key:
             return None
         key_hash = self._hash_key(full_key)
         for record in self._records:
             if record.key_hash == key_hash:
-                return record.key_preview
+                return record
+        return None
+
+    def get_key_preview(self, full_key: Optional[str]) -> Optional[str]:
+        record = self._find_record(full_key)
+        if record is not None:
+            return record.key_preview
+        if not full_key:
+            return None
+        key_hash = self._hash_key(full_key)
         if key_hash in self._bootstrap_hashes:
             return self._preview(full_key)
         return None
 
     def get_permissions(self, full_key: Optional[str]) -> Optional[str]:
+        record = self._find_record(full_key)
+        if record is not None:
+            return record.permissions
         if not full_key:
             return None
         key_hash = self._hash_key(full_key)
-        for record in self._records:
-            if record.key_hash == key_hash:
-                return record.permissions
         if key_hash in self._bootstrap_hashes:
             return "admin"
+        return None
+
+    def get_agent_id(self, full_key: Optional[str]) -> Optional[str]:
+        record = self._find_record(full_key)
+        if record is not None:
+            return record.agent_id
         return None
 
     def count(self) -> int:

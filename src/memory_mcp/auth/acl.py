@@ -18,7 +18,49 @@ class ACL:
         Args:
             config: ACL configuration with agents and permissions
         """
+        self._validate_config(config)
         self._config = config
+
+    def _validate_config(self, config: Dict[str, Any]) -> None:
+        """Validate ACL config structure eagerly so malformed ACL fails closed."""
+        if not isinstance(config, dict):
+            raise ValueError("ACL config must be a mapping")
+
+        agents = config.get("agents", {})
+        if not isinstance(agents, dict):
+            raise ValueError("ACL config field 'agents' must be a mapping")
+
+        for agent_name, agent_config in agents.items():
+            if not isinstance(agent_config, dict):
+                raise ValueError(f"ACL config for agent '{agent_name}' must be a mapping")
+
+            permissions = agent_config.get("permissions", {})
+            if not isinstance(permissions, dict):
+                raise ValueError(
+                    f"ACL permissions for agent '{agent_name}' must be a mapping"
+                )
+
+            namespace = permissions.get("namespace")
+            if namespace is not None and not isinstance(namespace, str):
+                raise ValueError(
+                    f"ACL namespace for agent '{agent_name}' must be a string"
+                )
+
+            operations = permissions.get("operations")
+            if operations is not None:
+                if not isinstance(operations, list) or not all(
+                    isinstance(operation, str) for operation in operations
+                ):
+                    raise ValueError(
+                        f"ACL operations for agent '{agent_name}' must be a list of strings"
+                    )
+
+            for flag_name in ("admin", "shared_read"):
+                flag_value = permissions.get(flag_name)
+                if flag_value is not None and not isinstance(flag_value, bool):
+                    raise ValueError(
+                        f"ACL flag '{flag_name}' for agent '{agent_name}' must be a boolean"
+                    )
 
     def _match_namespace(self, pattern: str, resource: str, agent_id: str) -> bool:
         """Check if a resource matches a namespace pattern.

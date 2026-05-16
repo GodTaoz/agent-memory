@@ -18,6 +18,8 @@ from memory_mcp.engine.memory import MemoryEngine
 
 router = APIRouter(prefix="/admin/api", tags=["admin"])
 
+RESERVED_SHARED_AGENT = "shared"
+
 
 # ============ Request/Response Models ============
 
@@ -40,6 +42,7 @@ class ApiKeyCreateRequest(BaseModel):
     name: str
     permissions: str = "read"  # read, read_write, admin
     description: Optional[str] = None
+    agent_id: Optional[str] = None
 
 
 class ApiKeyResponse(BaseModel):
@@ -51,6 +54,7 @@ class ApiKeyResponse(BaseModel):
     last_used: Optional[str]
     usage_count: int
     full_key: Optional[str] = None
+    agent_id: Optional[str] = None
 
 
 class MemoryItem(BaseModel):
@@ -151,6 +155,62 @@ def _get_redis_stats(engine: MemoryEngine) -> tuple[bool, str, int]:
 
 def _count_agents(memories: list) -> int:
     return len({memory.agent for memory in memories if getattr(memory, "agent", None)})
+
+
+def _memory_counts_by_agent(memories: list) -> dict[str, int]:
+    counts: dict[str, int] = {}
+    for memory in memories:
+        agent_id = getattr(memory, "agent", None)
+        if not agent_id:
+            continue
+        counts[agent_id] = counts.get(agent_id, 0) + 1
+    return counts
+
+
+def _permissions_label_from_acl(agent_config: Optional[dict]) -> str:
+    permissions = (agent_config or {}).get("permissions", {})
+    if permissions.get("admin"):
+        return "admin"
+
+    operations = permissions.get("operations", [])
+    if "write" in operations:
+        return "read_write"
+    return "read"
+
+
+def _build_agent_listing(request: Request, api_key_store: ApiKeyStore, engine: MemoryEngine) -> list[AgentInfo]:
+    memories = engine.list_memories(limit=engine.count(), offset=0)
+    memory_counts = _memory_counts_by_agent(memories)
+    agents: dict[str, AgentInfo] = {}
+
+    for record in api_key_store.list_keys():
+        agent_id = record.get("agent_id") or record.get("name")
+        if not agent_id or agent_id in agents:
+            continue
+        agents[agent_id] = AgentInfo(
+            agent_id=agent_id,
+            name=record.get("name"),
+            permissions=record.get("permissions", "read"),
+            last_active=record.get("last_used"),
+            memory_count=memory_counts.get(agent_id, 0),
+            api_key_preview=record.get("key_preview", "-"),
+        )
+
+    acl = getattr(request.app.state, "acl", None)
+    acl_agents = getattr(acl, "_config", {}).get("agents", {}) if acl is not None else {}
+    for agent_id, agent_config in acl_agents.items():
+        if agent_id == "default" or agent_id in agents:
+            continue
+        agents[agent_id] = AgentInfo(
+            agent_id=agent_id,
+            name=agent_config.get("name"),
+            permissions=_permissions_label_from_acl(agent_config),
+            last_active=None,
+            memory_count=memory_counts.get(agent_id, 0),
+            api_key_preview="-",
+        )
+
+    return sorted(agents.values(), key=lambda item: item.agent_id)
 
 
 # ============ Auth Routes ============
@@ -273,13 +333,31 @@ async def create_api_key(
     admin_logger: SQLiteLogger = Depends(get_admin_logger),
 ):
     """Create a new API key."""
+    resolved_agent_id = request.agent_id or request.name
+    if request.permissions != "admin" and resolved_agent_id == RESERVED_SHARED_AGENT:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Only admin API keys may use the reserved shared agent identity",
+        )
+
     payload = api_key_store.create_key(
         name=request.name,
         permissions=request.permissions,
         description=request.description,
+        agent_id=request.agent_id,
     )
     client_ip = http_request.client.host if http_request.client else None
-    admin_logger.log_operation("info", "api_key", f"Created API key {payload['key_preview']}", details={"name": request.name, "permissions": request.permissions}, ip_address=client_ip)
+    admin_logger.log_operation(
+        "info",
+        "api_key",
+        f"Created API key {payload['key_preview']}",
+        details={
+            "name": request.name,
+            "permissions": request.permissions,
+            "agent_id": payload.get("agent_id"),
+        },
+        ip_address=client_ip,
+    )
     return ApiKeyResponse(**payload)
 
 
@@ -416,10 +494,14 @@ async def export_memories_csv(
 # ============ Agent Management ============
 
 @router.get("/agents", response_model=list[AgentInfo])
-async def list_agents(token: str = Depends(require_admin_session)):
+async def list_agents(
+    request: Request,
+    token: str = Depends(require_admin_session),
+    api_key_store: ApiKeyStore = Depends(get_api_key_store),
+    engine: MemoryEngine = Depends(get_memory_engine),
+):
     """List all registered agents."""
-    # TODO: Implement actual agent listing
-    return []
+    return _build_agent_listing(request, api_key_store, engine)
 
 
 # ============ Operation Logs ============
