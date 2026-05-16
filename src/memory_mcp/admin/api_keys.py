@@ -11,6 +11,8 @@ from datetime import datetime
 from pathlib import Path
 from typing import Optional
 
+from .paths import default_data_path
+
 
 @dataclass
 class ApiKeyRecord:
@@ -48,7 +50,7 @@ class ApiKeyRecord:
             last_used=payload.get("last_used"),
             usage_count=payload.get("usage_count", 0),
             key_hash=payload["key_hash"],
-            agent_id=payload.get("agent_id") or payload.get("name"),
+            agent_id=payload.get("agent_id"),
         )
 
 
@@ -56,8 +58,8 @@ class ApiKeyStore:
     """JSON-backed API key store with usage tracking."""
 
     def __init__(self, path: Optional[str] = None, bootstrap_keys: Optional[list[str]] = None):
-        default_path = Path(__file__).resolve().parents[3] / "data" / "api_keys.json"
-        self.path = Path(path or os.environ.get("ADMIN_API_KEYS_PATH", str(default_path)))
+        resolved_path = Path(path).expanduser().resolve() if path else default_data_path("api_keys.json", "ADMIN_API_KEYS_PATH")
+        self.path = resolved_path
         self.path.parent.mkdir(parents=True, exist_ok=True)
         bootstrap_keys = bootstrap_keys or []
         self._bootstrap_hashes = {self._hash_key(key) for key in bootstrap_keys}

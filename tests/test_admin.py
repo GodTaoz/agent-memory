@@ -5,7 +5,6 @@ from unittest.mock import MagicMock
 import pytest
 from fastapi.testclient import TestClient
 
-from memory_mcp.admin import auth as admin_auth_module
 from memory_mcp.admin.auth import AdminAuth
 
 
@@ -122,14 +121,13 @@ class TestAdminAuth:
         assert auth.is_locked_out() is True
         assert auth.create_session("admin123") is None
 
-    def test_default_persisted_config_path_is_project_relative(self):
-        """Default persisted auth config path should live under the project data dir."""
+    def test_default_persisted_config_path_is_cwd_relative_data_dir(self, monkeypatch, tmp_path):
+        """Default persisted auth config path should live under the current working directory data dir."""
+        monkeypatch.delenv("ADMIN_AUTH_CONFIG_PATH", raising=False)
+        monkeypatch.chdir(tmp_path)
+
         auth = AdminAuth()
-        expected_path = (
-            admin_auth_module.Path(admin_auth_module.__file__).resolve().parents[3]
-            / "data"
-            / "admin_auth.json"
-        )
+        expected_path = tmp_path / "data" / "admin_auth.json"
 
         assert auth._config_path.is_absolute() is True
         assert auth._config_path == expected_path

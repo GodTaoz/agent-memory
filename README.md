@@ -171,8 +171,8 @@ Admin logs are stored in SQLite by default:
 
 Admin auth / API key persistence defaults:
 
-- admin password state: `data/admin_auth.json`
-- managed API keys: `data/api_keys.json`
+- admin password state: `data/admin_auth.json` relative to the current working directory
+- managed API keys: `data/api_keys.json` relative to the current working directory
 
 ---
 
@@ -206,6 +206,7 @@ Managed REST API keys are tenant-bound by default:
 - default list/search/get access also includes the reserved shared namespace (`agent="shared"`) unless an active ACL disables `shared_read` for that managed key
 - only admin keys may create, update, or delete shared memories
 - non-admin managed keys may not be created with the reserved shared identity
+- legacy managed keys loaded from older `data/api_keys.json` files without an `agent_id` remain unscoped until rotated or recreated
 - see [`docs/permissions.md`](docs/permissions.md) for the full ownership model and current limitations
 
 ### Health check

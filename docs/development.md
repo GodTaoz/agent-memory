@@ -76,7 +76,7 @@ Start from the example files:
 Common local-development settings:
 
 - Redis host/port live in `config/config.yaml`
-- managed admin auth state is written under the repository-local `data/`
+- managed admin auth state is written under the current working directory `data/`
 - admin logs default to `data/admin_logs.db` relative to the current working directory unless `ADMIN_LOG_DB_PATH` is set
 - `config/permissions.example.yaml` is an optional reference file; if you copy it to `config/permissions.yaml`, the FastAPI startup path now loads it and malformed ACL config shape fails startup rather than silently disabling ACL
 
@@ -107,4 +107,4 @@ uvicorn memory_mcp.main:create_app --factory --host 0.0.0.0 --port 5678
 
 ### Admin files appear under `data/`
 
-This is expected. By default the admin password state and managed API key state are persisted under the repository-local `data/` directory. Admin logs default to `data/admin_logs.db` relative to the process working directory unless `ADMIN_LOG_DB_PATH` is set.
+This is expected. By default the admin password state and managed API key state are persisted under the process working directory `data/` directory. Admin logs default to `data/admin_logs.db` relative to the process working directory unless `ADMIN_LOG_DB_PATH` is set.

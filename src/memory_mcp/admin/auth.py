@@ -10,16 +10,16 @@ from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Optional
 
+from .paths import default_data_path
+
 
 def get_config() -> dict:
     """Get admin configuration from environment variables."""
-    project_root = Path(__file__).resolve().parents[3]
-    default_config_path = project_root / "data" / "admin_auth.json"
-    configured_path = os.environ.get("ADMIN_AUTH_CONFIG_PATH")
+    default_config_path = default_data_path("admin_auth.json", "ADMIN_AUTH_CONFIG_PATH")
 
     return {
         "admin": {
-            "config_path": configured_path or str(default_config_path),
+            "config_path": str(default_config_path),
             "password_hash": os.environ.get("ADMIN_PASSWORD_HASH"),
             "password_salt": os.environ.get("ADMIN_PASSWORD_SALT", ""),
         }

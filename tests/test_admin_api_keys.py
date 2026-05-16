@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import hashlib
+import json
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
@@ -699,6 +701,76 @@ def test_api_key_store_file_permissions_are_owner_only(tmp_path, monkeypatch) ->
 
     mode = Path(tmp_path / "api_keys.json").stat().st_mode & 0o777
     assert mode == 0o600
+
+
+def test_api_key_store_default_path_uses_cwd_data_dir(monkeypatch, tmp_path) -> None:
+    monkeypatch.delenv("ADMIN_API_KEYS_PATH", raising=False)
+    monkeypatch.chdir(tmp_path)
+
+    app = create_app(FakeEngine(), auth_config={})
+    store = app.state.api_key_store
+
+    assert store.path.is_absolute() is True
+    assert store.path == tmp_path / "data" / "api_keys.json"
+
+
+def test_legacy_managed_key_without_agent_id_keeps_unscoped_behavior(tmp_path, monkeypatch) -> None:
+    monkeypatch.setenv("ADMIN_AUTH_CONFIG_PATH", str(tmp_path / "admin_auth.json"))
+    legacy_store_path = tmp_path / "api_keys.json"
+    monkeypatch.setenv("ADMIN_API_KEYS_PATH", str(legacy_store_path))
+
+    legacy_key = "amk_legacy_reader"
+    legacy_store_path.write_text(
+        json.dumps(
+            {
+                "enforced": True,
+                "api_keys": [
+                    {
+                        "key_preview": "amk_legacy_r...",
+                        "name": "legacy-reader",
+                        "permissions": "read_write",
+                        "description": "pre-agent-id key",
+                        "created_at": "2026-05-01T00:00:00",
+                        "last_used": None,
+                        "usage_count": 0,
+                        "key_hash": hashlib.sha256(legacy_key.encode("utf-8")).hexdigest(),
+                    }
+                ],
+            },
+            ensure_ascii=False,
+            indent=2,
+        ),
+        encoding="utf-8",
+    )
+
+    app = create_app(FakeWritableEngine(), auth_config={})
+    client = TestClient(app)
+    admin_headers = _login_admin(client)
+
+    admin_key = client.post(
+        "/admin/api/api-keys",
+        headers=admin_headers,
+        json={"name": "ops-admin", "permissions": "admin"},
+    )
+    assert admin_key.status_code == 201
+    managed_admin_headers = {"X-API-Key": admin_key.json()["full_key"]}
+
+    bob_memory = client.post(
+        "/api/v1/memories",
+        headers=managed_admin_headers,
+        json={"content": "Bob memory", "agent": "bob"},
+    )
+    assert bob_memory.status_code == 201
+
+    legacy_headers = {"X-API-Key": legacy_key}
+    listing = client.get("/api/v1/memories?agent=bob", headers=legacy_headers)
+    assert listing.status_code == 200
+    assert listing.json()["memories"][0]["agent"] == "bob"
+
+    api_keys = client.get("/admin/api/api-keys", headers=admin_headers)
+    assert api_keys.status_code == 200
+    legacy_record = next(item for item in api_keys.json() if item["name"] == "legacy-reader")
+    assert legacy_record["agent_id"] is None
 
 
 

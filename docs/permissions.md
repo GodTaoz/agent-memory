@@ -5,7 +5,7 @@ This document defines the current v0.1 isolation model for `agent-memory`.
 ## Terms
 
 - **agent**: the logical owner/namespace of a memory entry, stored in the memory object's `agent` field.
-- **managed REST API key**: a key created through the admin panel/API and persisted in `data/api_keys.json`.
+- **managed REST API key**: a key created through the admin panel/API and persisted in `data/api_keys.json` relative to the current working directory unless `ADMIN_API_KEYS_PATH` is set.
 - **bootstrap API key**: a key supplied through the `API_KEYS` environment variable.
 - **admin request**: a request authenticated with an admin-permission key.
 
@@ -30,6 +30,8 @@ Each managed API key has:
 - `agent_id`
 
 If `agent_id` is omitted when creating a managed key, it defaults to the key `name`.
+
+Legacy persisted managed keys that predate the `agent_id` field remain unscoped when reloaded from disk. Rotate or recreate them if you want tenant-bound behavior.
 
 The reserved shared namespace also reserves the corresponding identity:
 

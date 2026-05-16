@@ -153,8 +153,8 @@ memory-mcp
 
 管理员认证 / API Key 持久化默认路径：
 
-- 管理员密码状态：`data/admin_auth.json`
-- 受管 API Keys：`data/api_keys.json`
+- 管理员密码状态：相对于当前工作目录的 `data/admin_auth.json`
+- 受管 API Keys：相对于当前工作目录的 `data/api_keys.json`
 
 ---
 
@@ -188,6 +188,7 @@ curl 'http://localhost:5678/api/v1/memories?q=concise&agent=hermes&api_key=your-
 - 非 `admin` key 在读取时还能访问保留的共享命名空间（`agent="shared"`），除非活动 ACL 显式关闭该身份的 `shared_read`
 - 只有 `admin` key 可以创建、修改或删除共享记忆
 - 非 `admin` 的受管 key 不能绑定到保留的共享身份 `shared`
+- 从旧版 `data/api_keys.json` 载入、且没有 `agent_id` 的历史受管 key 会保持未绑定状态，直到它们被轮换或重建
 - 完整规则与限制见 [`docs/permissions.md`](docs/permissions.md)
 
 ### 健康检查
@@ -244,8 +245,8 @@ tools = server.get_tools()
 | `API_KEYS` | 空 | 启动时注入的 REST API Keys（可选兼容路径） |
 | `ADMIN_PASSWORD_HASH` | 空 | 可选的管理员密码哈希 |
 | `ADMIN_PASSWORD_SALT` | 空 | 管理员密码哈希使用的盐 |
-| `ADMIN_AUTH_CONFIG_PATH` | `data/admin_auth.json` | 管理员密码状态持久化文件 |
-| `ADMIN_API_KEYS_PATH` | `data/api_keys.json` | 受管 API Key 持久化文件 |
+| `ADMIN_AUTH_CONFIG_PATH` | `data/admin_auth.json` | 管理员密码状态持久化文件（默认相对于当前工作目录） |
+| `ADMIN_API_KEYS_PATH` | `data/api_keys.json` | 受管 API Key 持久化文件（默认相对于当前工作目录） |
 | `ADMIN_LOG_DB_PATH` | `data/admin_logs.db` | 保存管理日志和 REST 访问统计的 SQLite 路径 |
 | `LOG_LEVEL` | `INFO` | 日志级别 |
 
