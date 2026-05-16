@@ -8,13 +8,15 @@ import logging
 from typing import Any, Dict, List, Optional
 
 from memory_mcp.engine.memory import MemoryEngine
-from memory_mcp.models import Memory
+from memory_mcp.models import Confidence, Memory
 
 logger = logging.getLogger(__name__)
 
 
 class MCPServer:
     """MCP Server for memory operations."""
+
+    NOT_FOUND_ERROR = {"error": "Memory not found"}
 
     def __init__(self, engine: MemoryEngine):
         """Initialize MCP server.
@@ -78,7 +80,9 @@ class MCPServer:
                     "properties": {
                         "id": {"type": "string", "description": "Memory ID"},
                         "content": {"type": "string", "description": "New content"},
-                        "tags": {"type": "array", "items": {"type": "string"}, "description": "New tags"}
+                        "tags": {"type": "array", "items": {"type": "string"}, "description": "New tags"},
+                        "confidence": {"type": "string", "enum": ["high", "medium", "low"], "description": "New confidence level"},
+                        "metadata": {"type": "object", "description": "Metadata updates"}
                     },
                     "required": ["id"]
                 }
@@ -170,7 +174,8 @@ class MCPServer:
             id=self._engine.generate_id(),
             content=content,
             tags=arguments.get("tags", []),
-            agent=arguments.get("agent", "")
+            agent=arguments.get("agent", ""),
+            confidence=Confidence(arguments.get("confidence", "high"))
         )
         
         success = self._engine.save(memory)
@@ -184,7 +189,7 @@ class MCPServer:
         
         memory = self._engine.get(memory_id)
         if memory is None:
-            return {"error": f"Memory not found: {memory_id}"}
+            return self.NOT_FOUND_ERROR.copy()
         
         return {"memory": memory.to_dict()}
 
@@ -202,7 +207,10 @@ class MCPServer:
             limit=limit
         )
         
-        return {"memories": [m.to_dict() for m in results]}
+        return {
+            "memories": [m.to_dict() for m in results],
+            "total": len(results)
+        }
 
     def _handle_update(self, arguments: Dict[str, Any]) -> Dict[str, Any]:
         """Handle memory.update tool call."""
@@ -215,10 +223,14 @@ class MCPServer:
             updates["content"] = arguments["content"]
         if "tags" in arguments:
             updates["tags"] = arguments["tags"]
+        if "confidence" in arguments:
+            updates["confidence"] = Confidence(arguments["confidence"]).value
+        if "metadata" in arguments:
+            updates["metadata"] = arguments["metadata"]
         
         memory = self._engine.update(memory_id, updates)
         if memory is None:
-            return {"error": f"Memory not found: {memory_id}"}
+            return self.NOT_FOUND_ERROR.copy()
         
         return {"memory": memory.to_dict()}
 
@@ -229,7 +241,10 @@ class MCPServer:
             return {"error": "ID is required"}
         
         success = self._engine.delete(memory_id)
-        return {"success": success}
+        if not success:
+            return self.NOT_FOUND_ERROR.copy()
+
+        return {"success": True}
 
     def _handle_list(self, arguments: Dict[str, Any]) -> Dict[str, Any]:
         """Handle memory.list tool call."""
@@ -237,7 +252,10 @@ class MCPServer:
         offset = arguments.get("offset", 0)
         
         memories = self._engine.list_memories(limit=limit, offset=offset)
-        return {"memories": [m.to_dict() for m in memories]}
+        return {
+            "memories": [m.to_dict() for m in memories],
+            "total": len(memories)
+        }
 
     def _handle_health(self, arguments: Dict[str, Any]) -> Dict[str, Any]:
         """Handle memory.health tool call."""

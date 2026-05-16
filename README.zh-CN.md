@@ -89,6 +89,7 @@ git clone https://github.com/GodTaoz/agent-memory.git
 cd agent-memory
 
 cp config/config.example.yaml config/config.yaml
+# 可选：复制为运行时 ACL 配置；若 ACL 配置结构非法，FastAPI 启动会直接失败而不是静默关闭 ACL
 cp config/permissions.example.yaml config/permissions.yaml
 
 # 可选：导出运行时密钥
@@ -178,6 +179,17 @@ curl -X POST http://localhost:5678/api/v1/memories \
 curl 'http://localhost:5678/api/v1/memories?q=concise&agent=hermes&api_key=your-api-key'
 ```
 
+### 多 Agent 说明
+
+受管 REST API Key 默认会绑定一个租户身份：
+
+- 如果创建 key 时只给 `name=writer`，没有显式 `agent_id`，它就会作为 `writer` 这个 agent 身份运行
+- 非 `admin` key 的创建 / 修改 / 删除请求默认只能操作自己的私有记忆
+- 非 `admin` key 在读取时还能访问保留的共享命名空间（`agent="shared"`），除非活动 ACL 显式关闭该身份的 `shared_read`
+- 只有 `admin` key 可以创建、修改或删除共享记忆
+- 非 `admin` 的受管 key 不能绑定到保留的共享身份 `shared`
+- 完整规则与限制见 [`docs/permissions.md`](docs/permissions.md)
+
 ### 健康检查
 
 ```bash
@@ -198,25 +210,22 @@ curl http://localhost:5678/api/v1/health
 
 ## MCP 集成
 
-stdio client 使用示例：
+仓库中已经包含 `src/memory_mcp/protocol/mcp.py` 里的 MCP 工具定义，但当前里程碑经过验证的本地运行时仍然是通过 `memory_mcp.main:create_app` 或 `memory-mcp` 启动的 FastAPI REST / admin 服务。
+
+现阶段请把 MCP 层视为一个已经实现了契约的协议面：它已经具备工具定义与处理逻辑，但在作为独立 stdio MCP Server 启动之前，仍需要专门的 transport / bootstrap 入口。
+
+当前 MCP 工具面如下：
 
 ```python
-from mcp import ClientSession, StdioServerParameters
-from mcp.client.stdio import stdio_client
+from memory_mcp.protocol.mcp import MCPServer
 
-server_params = StdioServerParameters(
-    command="python",
-    args=["-m", "memory_mcp.protocol.mcp"],
-)
-
-async with stdio_client(server_params) as (read, write):
-    async with ClientSession(read, write) as session:
-        await session.initialize()
-        await session.call_tool("memory.save", {
-            "content": "User prefers concise and elegant code.",
-            "tags": ["preference", "coding"],
-        })
+server = MCPServer(engine)
+tools = server.get_tools()
 ```
+
+当前 v0.1 的 REST/MCP 协议清单（包括错误语义与分页/搜索语义）见：[`docs/protocol-parity.md`](docs/protocol-parity.md)。
+
+当前多 Agent 隔离与 REST 权限模型见：[`docs/permissions.md`](docs/permissions.md)。
 
 ---
 
@@ -243,12 +252,12 @@ async with stdio_client(server_params) as (read, write):
 ### 配置文件
 
 - `config/config.yaml` - server / Redis / search / logging 配置
-- `config/permissions.yaml` - agent 权限 / ACL 相关配置
+- `config/permissions.yaml` - 可选 ACL 运行时配置；存在时会在 FastAPI 启动阶段加载，若 ACL 配置结构非法会直接启动失败
 
 可以从下面两个示例开始：
 
 - `config/config.example.yaml`
-- `config/permissions.example.yaml`
+- `config/permissions.example.yaml`（可作为后续 ACL 设计参考）
 
 ---
 
@@ -323,10 +332,16 @@ agent-memory/
 - 管理员密码状态持久化
 - 受管 API Key 持久化与吊销
 - 强制 API Key 权限控制（`read` vs `read_write`）
+- 受管 REST API Key 默认绑定一个 `agent_id` 身份，非 `admin` key 默认只能写自己的私有记忆
+- 非 `admin` key 在读取时还可以访问保留的共享命名空间（`agent="shared"`），除非活动 ACL 显式关闭该身份的 `shared_read`
+- 只有 `admin` key 可以创建、修改或删除共享记忆
+- 非 `admin` 的受管 key 不能绑定到保留的共享身份 `shared`
 - SQLite 中的登录 / 管理操作 / REST 访问审计日志
 - 多次失败后登录锁定
 - 管理员密码状态文件权限收紧为仅 owner 可读写（`0600`）
 - API Key 存储文件权限收紧为仅 owner 可读写（`0600`）
+
+当前所有权模型、管理员越权规则与已知限制见：[`docs/permissions.md`](docs/permissions.md)。
 
 在生产环境中仍建议继续增加：
 

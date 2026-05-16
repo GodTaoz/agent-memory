@@ -78,7 +78,7 @@ Common local-development settings:
 - Redis host/port live in `config/config.yaml`
 - managed admin auth state is written under the repository-local `data/`
 - admin logs default to `data/admin_logs.db` relative to the current working directory unless `ADMIN_LOG_DB_PATH` is set
-- `config/permissions.example.yaml` is an optional reference file for planned ACL/isolation work; the current FastAPI startup path does not load `config/permissions.yaml`
+- `config/permissions.example.yaml` is an optional reference file; if you copy it to `config/permissions.yaml`, the FastAPI startup path now loads it and malformed ACL config shape fails startup rather than silently disabling ACL
 
 ## Troubleshooting
 

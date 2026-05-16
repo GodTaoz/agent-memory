@@ -89,6 +89,9 @@ git clone https://github.com/GodTaoz/agent-memory.git
 cd agent-memory
 
 cp config/config.example.yaml config/config.yaml
+# optional: enable runtime ACL rules for managed REST keys
+cp config/permissions.example.yaml config/permissions.yaml
+# note: malformed ACL config shape in config/permissions.yaml fails startup
 
 # optional: export runtime secrets consumed by docker-compose.yml
 export REDIS_PASSWORD='your-redis-password'
@@ -113,6 +116,9 @@ python -m pip install --upgrade pip
 pip install -e '.[all]'
 
 cp config/config.example.yaml config/config.yaml
+# optional: enable runtime ACL rules for managed REST keys
+cp config/permissions.example.yaml config/permissions.yaml
+# note: malformed ACL config shape in config/permissions.yaml fails startup
 
 # run the test suite
 pytest -q
@@ -135,6 +141,8 @@ Additional developer docs:
 
 - `docs/development.md` - environment setup, verification commands, and troubleshooting
 - `docs/architecture.md` - high-level system layout and component responsibilities
+- `docs/protocol-parity.md` - current REST/MCP contract checklist
+- `docs/permissions.md` - current multi-agent isolation and REST permission model
 
 ---
 
@@ -189,6 +197,17 @@ curl -X POST http://localhost:5678/api/v1/memories \
 curl 'http://localhost:5678/api/v1/memories?q=concise&agent=hermes&api_key=your-api-key'
 ```
 
+### Multi-agent note
+
+Managed REST API keys are tenant-bound by default:
+
+- if a managed key is created with `name=writer` and no explicit `agent_id`, it acts as agent `writer`
+- create/update/delete requests are scoped to that agent unless the key has `admin` permissions
+- default list/search/get access also includes the reserved shared namespace (`agent="shared"`) unless an active ACL disables `shared_read` for that managed key
+- only admin keys may create, update, or delete shared memories
+- non-admin managed keys may not be created with the reserved shared identity
+- see [`docs/permissions.md`](docs/permissions.md) for the full ownership model and current limitations
+
 ### Health check
 
 ```bash
@@ -222,6 +241,8 @@ server = MCPServer(engine)
 tools = server.get_tools()
 ```
 
+For the current v0.1 REST/MCP contract checklist, including error and pagination semantics, see [`docs/protocol-parity.md`](docs/protocol-parity.md).
+
 ---
 
 ## Configuration
@@ -247,7 +268,7 @@ tools = server.get_tools()
 ### Config files
 
 - `config/config.yaml` - server / Redis / search / logging config
-- `config/permissions.yaml` - example ACL-related config for future isolation work; the current FastAPI startup path does not load it yet
+- `config/permissions.yaml` - ACL config loaded by the FastAPI startup path when present; malformed ACL config shape fails startup instead of silently disabling ACL
 
 You can start from:
 
@@ -327,10 +348,13 @@ Current baseline security includes REST API key auth and admin login, and the ad
 - persisted admin password state
 - managed API key persistence + revocation
 - enforced API key permissions (`read` vs `read_write`)
+- managed REST keys default to an `agent_id` identity and are private to that agent unless the key is `admin`
 - login / admin mutation / REST access audit logs in SQLite
 - failed-login lockout after repeated attempts
 - password state file permissions tightened to owner-only (`0600`)
 - API key store file permissions tightened to owner-only (`0600`)
+
+For the current ownership model, admin override rules, and known cross-agent limitations, see [`docs/permissions.md`](docs/permissions.md).
 
 For production you should still add:
 
