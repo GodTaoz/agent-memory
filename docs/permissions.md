@@ -8,6 +8,7 @@ This document defines the current v0.1 isolation model for `agent-memory`.
 - **managed REST API key**: a key created through the admin panel/API and persisted in `data/api_keys.json`.
 - **bootstrap API key**: a key supplied through the `API_KEYS` environment variable.
 - **admin request**: a request authenticated with an admin-permission key.
+- **shared namespace**: a namespace prefix listed in `shared_namespaces`; when omitted, the default shared namespace is `shared`.
 
 ## Canonical model in v0.1
 
@@ -17,9 +18,31 @@ The current runtime model is:
 - managed REST API keys are **tenant-bound identities**
 - cross-agent access is **denied by default** for non-admin REST keys
 - admin keys can access all memories
-- the reserved `shared` agent namespace is **readable by managed non-admin REST keys by default**, unless an active ACL disables `shared_read` for that identity
-- only admin keys can create, update, or delete `shared` memories
+- shared namespaces are **readable by managed non-admin REST keys only when the active ACL allows `shared_read`**
+- only admin keys can create, update, or delete shared memories
 - authenticated MCP transport/auth remains unimplemented, so this runtime rule currently applies to REST only
+
+## Shared namespace model
+
+ACL config may define top-level shared namespace prefixes:
+
+```yaml
+shared_namespaces:
+  - "shared"
+  - "team"
+```
+
+Behavior:
+
+- if `shared_namespaces` is omitted, the default is `["shared"]`
+- any memory whose `agent` value matches one of these namespace names is treated as a shared namespace by ACL shared-read checks
+- `shared_read: true` grants read access to those namespaces only
+- non-admin keys still cannot write, update, or delete shared memories
+
+Examples:
+
+- `shared:memory:123`
+- `team:memory:456` when `shared_namespaces: ["shared", "team"]`
 
 ## How managed REST API keys map to agent identity
 
@@ -31,7 +54,7 @@ Each managed API key has:
 
 If `agent_id` is omitted when creating a managed key, it defaults to the key `name`.
 
-The reserved shared namespace also reserves the corresponding identity:
+The default shared namespace also reserves the corresponding identity:
 
 - non-admin managed keys may **not** resolve to `agent_id = "shared"`
 - admin keys may still use that identity when they intentionally manage shared memories
@@ -60,18 +83,19 @@ For a managed non-admin key bound to `agent_id = X`:
 - if the request omits `agent`, the server stores the memory with `agent = X`
 - if the request sets `agent = X`, the request succeeds
 - if the request sets `agent` to any other value, the request is rejected with `403`
+- if the request targets a shared namespace, the request is rejected unless the caller is admin
 
 ### List / search
 
 - default results include:
   - private memories with `agent = X`
-  - shared memories with `agent = "shared"` when the active ACL allows `shared_read`
+  - shared memories whose `agent` is in `shared_namespaces` when the active ACL allows `shared_read`
 - requesting another private agent namespace through the `agent` filter is rejected with `403`
-- requesting `agent=shared` is allowed only when the active ACL allows shared reads, and returns shared memories only
+- requesting a shared namespace directly is allowed only when the active ACL allows shared reads, and returns shared memories only
 
 ### Get / update / delete
 
-- `get` succeeds when the target memory has `agent = X` or `agent = "shared"`
+- `get` succeeds when the target memory has `agent = X` or belongs to a configured shared namespace allowed by ACL
 - `update` and `delete` succeed only when the target memory has `agent = X`
 - non-admin keys cannot modify shared memories; those requests return `403`
 - accessing another agent's private memory returns `403`
@@ -88,13 +112,11 @@ Bootstrap `API_KEYS` are treated as admin-permission keys in the current runtime
 
 ## Shared memory status
 
-The runtime now reserves `agent = "shared"` as a simple shared-read namespace for REST.
-
 Current status:
 
 - private per-agent access: implemented for managed REST keys
 - admin override: implemented
-- shared read namespace (`agent = "shared"`): implemented for REST
+- shared read namespaces from `shared_namespaces`: implemented in ACL checks
 - shared writes by non-admin keys: denied
 - tenant-aware MCP transport/auth: not implemented yet
 - `/api/v1/health` and `/api/v1/stats` still expose global operational counts; they are not tenant-scoped endpoints yet
@@ -182,14 +204,16 @@ Managed non-admin keys can:
 - request `GET /api/v1/memories?agent=shared` to see only shared memories when the active ACL allows shared reads
 - fetch the memory directly by ID when the active ACL allows shared reads
 
+If `shared_namespaces` includes extra values such as `team`, the same read rules apply to those namespaces as well.
+
 Managed non-admin keys cannot:
 
-- create a memory with `agent = "shared"`
+- create a memory in a shared namespace
 - update or delete a shared memory
 
 ## Known limitations
 
 - REST list pagination still uses the current response-size `total` contract from `docs/protocol-parity.md`
 - tenant isolation is enforced in REST, not yet in an authenticated MCP transport
-- only the reserved REST `shared` namespace is implemented; richer shared grants and explicit cross-agent ACLs remain future work
+- only reserved shared namespaces plus ACL-based shared reads are implemented; richer shared grants and explicit cross-agent ACLs remain future work
 - the admin agent-management view now surfaces managed API-key identities and ACL-only agents, but richer per-agent analytics and non-REST identity sources remain future work

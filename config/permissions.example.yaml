@@ -1,5 +1,10 @@
 # Agent permissions configuration
 # Each agent has a namespace pattern and allowed operations
+# Shared memory namespaces can be declared at the top level.
+
+shared_namespaces:
+  - "shared"
+  - "team"
 
 agents:
   hermes:
