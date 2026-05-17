@@ -9,12 +9,13 @@ Thanks for your interest in contributing to `agent-memory`.
 3. Add or update tests before changing behavior.
 4. Run verification locally:
    ```bash
-   pytest
-   black src tests
-   flake8 src tests
-   mypy src
+   pytest -q
+   black --check src/memory_mcp/main.py src/memory_mcp/mcp_runtime.py tests/test_mcp_runtime.py examples
+   flake8 src/memory_mcp/main.py src/memory_mcp/mcp_runtime.py tests/test_mcp_runtime.py examples
+   mypy src/memory_mcp/main.py src/memory_mcp/mcp_runtime.py
    ```
 5. Keep docs and config examples in sync with code changes.
+6. Note that repository-wide lint/type cleanup still has historical baseline debt; current CI enforces the runnable-surface checks above plus the full test suite.
 
 ## Scope expectations
 

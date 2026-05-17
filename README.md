@@ -23,6 +23,7 @@ It is designed to be:
 
 ### Core memory service
 - MCP + REST dual protocol support
+- Verified stdio MCP runtime via `memory-mcp-stdio`
 - Redis-backed persistence
 - Memory CRUD and list/search APIs
 - Multi-level indexing: agent / tag / keyword / time
@@ -135,6 +136,13 @@ If you want to run via console script after installation:
 memory-mcp
 ```
 
+To run the MCP stdio runtime after installation:
+
+```bash
+# requires the same Redis/config setup as the REST runtime
+memory-mcp-stdio
+```
+
 `memory-mcp` reads bind settings from `config/config.yaml` plus environment overrides such as `SERVER_HOST` and `SERVER_PORT`. The explicit `uvicorn ... --host ... --port ...` example above overrides the bind address at launch time.
 
 Additional developer docs:
@@ -143,6 +151,10 @@ Additional developer docs:
 - `docs/architecture.md` - high-level system layout and component responsibilities
 - `docs/protocol-parity.md` - current REST/MCP contract checklist
 - `docs/permissions.md` - current multi-agent isolation and REST permission model
+- `docs/api.md` - verified REST endpoint guide
+- `docs/mcp.md` - verified MCP stdio runtime guide
+- `docs/deployment.md` - local, Docker, and NAS deployment notes
+- `docs/release-checklist.md` - release verification checklist
 
 ---
 
@@ -171,8 +183,9 @@ Admin logs are stored in SQLite by default:
 
 Admin auth / API key persistence defaults:
 
-- admin password state: `data/admin_auth.json`
-- managed API keys: `data/api_keys.json`
+- admin password state: `data/admin_auth.json` relative to the project root
+- managed API keys: `data/api_keys.json` relative to the project root
+- admin logs: `data/admin_logs.db` relative to the current working directory
 
 ---
 
@@ -222,15 +235,22 @@ curl http://localhost:5678/api/v1/health
 - `DELETE /api/v1/memories/{id}`
 - `GET /api/v1/memories`
 - `GET /api/v1/health`
-- `GET /api/v1/stats`
+- `GET /api/v1/stats` (requires an API key when managed-key enforcement is enabled)
 
 ---
 
 ## MCP integration
 
-The repository includes MCP tool definitions in `src/memory_mcp/protocol/mcp.py`, but the verified local runtime in this milestone is the FastAPI REST/admin service started through `memory_mcp.main:create_app` or `memory-mcp`.
+`agent-memory` ships both:
 
-Treat the MCP layer as an implementation surface that still needs a dedicated transport/bootstrap entrypoint before it can be launched as a standalone stdio server.
+- the in-process MCP adapter in `src/memory_mcp/protocol/mcp.py`
+- the runnable FastMCP stdio server in `src/memory_mcp/mcp_runtime.py`
+
+Start the stdio runtime with:
+
+```bash
+memory-mcp-stdio
+```
 
 Current MCP tool surface:
 
@@ -240,6 +260,12 @@ from memory_mcp.protocol.mcp import MCPServer
 server = MCPServer(engine)
 tools = server.get_tools()
 ```
+
+For runnable usage and Hermes Agent configuration, see:
+
+- [`docs/mcp.md`](docs/mcp.md)
+- [`examples/mcp_stdio_client.py`](examples/mcp_stdio_client.py)
+- [`examples/hermes_agent.md`](examples/hermes_agent.md)
 
 For the current v0.1 REST/MCP contract checklist, including error and pagination semantics, see [`docs/protocol-parity.md`](docs/protocol-parity.md).
 
@@ -306,10 +332,12 @@ pytest
 ### Suggested checks
 
 ```bash
-black src tests
-flake8 src tests
-mypy src
+black --check src/memory_mcp/main.py src/memory_mcp/mcp_runtime.py tests/test_mcp_runtime.py examples
+flake8 src/memory_mcp/main.py src/memory_mcp/mcp_runtime.py tests/test_mcp_runtime.py examples
+mypy src/memory_mcp/main.py src/memory_mcp/mcp_runtime.py
 ```
+
+Current CI enforces the runnable-surface checks above plus the full `pytest -q` suite. Repository-wide lint/type cleanup still has historical baseline debt and should be handled in a separate follow-up.
 
 ### Branch policy
 
@@ -323,6 +351,7 @@ This repository uses **`master`** as the default working branch.
 agent-memory/
 ├── admin-frontend/              # Vue 3 admin UI source
 ├── config/                      # Example and runtime config
+├── examples/                    # Runnable REST/MCP/Hermes examples
 ├── src/memory_mcp/
 │   ├── admin/                   # Admin backend + built static files
 │   ├── auth/                    # Auth and ACL modules
@@ -330,8 +359,9 @@ agent-memory/
 │   ├── protocol/                # MCP / REST interfaces
 │   ├── storage/                 # Redis backend and indexes
 │   ├── config.py                # Config loader
+│   ├── mcp_runtime.py           # Runnable FastMCP stdio entrypoint
 │   ├── models.py                # Data model
-│   └── main.py                  # Runtime entrypoint
+│   └── main.py                  # REST/admin runtime entrypoint
 ├── tests/                       # Test suite
 ├── Dockerfile
 ├── docker-compose.yml

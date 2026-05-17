@@ -25,14 +25,19 @@ def _load_permissions_config(path: Optional[Path]) -> Optional[Dict[str, Any]]:
         data = yaml.safe_load(handle) or {}
 
     if not isinstance(data, dict):
-        raise ValueError(f"Invalid permissions.yaml at {path}: top-level YAML value must be a mapping")
+        raise ValueError(
+            "Invalid permissions.yaml at "
+            f"{path}: top-level YAML value must be a mapping"
+        )
 
     return data
 
 
 def _load_auth_config() -> Dict[str, Any]:
     """Load API key configuration from environment variables and optional ACL config."""
-    api_keys = [key.strip() for key in os.environ.get("API_KEYS", "").split(",") if key.strip()]
+    api_keys = [
+        key.strip() for key in os.environ.get("API_KEYS", "").split(",") if key.strip()
+    ]
     auth_config: Dict[str, Any] = {"api_keys": api_keys}
 
     permissions_path = _project_root() / "config" / "permissions.yaml"
@@ -47,11 +52,12 @@ def _project_root() -> Path:
     return Path(__file__).resolve().parents[2]
 
 
-def create_app():
-    """Factory for creating the FastAPI application."""
+def create_engine() -> MemoryEngine:
+    """Create the shared memory engine used by REST and MCP runtimes."""
     config_path = _project_root() / "config" / "config.yaml"
-
-    config = load_config(str(config_path) if config_path.exists() else None, use_env=True)
+    config = load_config(
+        str(config_path) if config_path.exists() else None, use_env=True
+    )
 
     backend = RedisBackend(
         host=config.redis_host,
@@ -63,15 +69,20 @@ def create_app():
     backend.connect()
 
     index = IndexManager(backend._ensure_connected(), prefix=config.redis_key_prefix)
-    engine = MemoryEngine(backend, index)
+    return MemoryEngine(backend, index)
 
-    return create_rest_app(engine, auth_config=_load_auth_config())
+
+def create_app():
+    """Factory for creating the FastAPI application."""
+    return create_rest_app(create_engine(), auth_config=_load_auth_config())
 
 
 def run() -> None:
     """Run the application server."""
     config_path = _project_root() / "config" / "config.yaml"
-    config = load_config(str(config_path) if config_path.exists() else None, use_env=True)
+    config = load_config(
+        str(config_path) if config_path.exists() else None, use_env=True
+    )
     uvicorn.run(
         "memory_mcp.main:create_app",
         factory=True,
